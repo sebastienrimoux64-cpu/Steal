@@ -5,6 +5,11 @@
 ![Maison](Previews/House_Exterior.png)
 ![Intérieur en coupe](Previews/House_Interior_Cutaway.png)
 
+## Prévisualisation 3D
+- **Showroom** : tous les assets alignés par catégorie (mur, sol, toit, porte, canapé…), sur socles étiquetés — `Scenes/Showroom.glb`
+- **Maison d'exemple** : extérieur, intérieur en coupe et salon — `Scenes/Example_Place.glb`
+- **Visualiseur web** prêt à l'emploi : `Viewer/index.html`
+
 ## Ce que vous obtenez
 - **89 assets** en 9 catégories (structure, sols & toits, portes & fenêtres, salon, chambre, cuisine, salle de bain, éclairage & déco, extérieur)
 - **Système modulaire** sur grille de 2 m : les pièces s'assemblent sans trou ni réglage

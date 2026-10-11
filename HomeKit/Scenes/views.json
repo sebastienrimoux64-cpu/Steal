@@ -1,0 +1,282 @@
+{
+ "showroom": {
+  "scene": "Showroom",
+  "rows": [
+   {
+    "cat": "01_Structure",
+    "y": 0.0,
+    "x1": 38.00199997425079,
+    "depth": 0.36000001430511475,
+    "n": 12,
+    "title": "01  STRUCTURE"
+   },
+   {
+    "cat": "02_Floors_Roofs",
+    "y": 4.760000014305115,
+    "x1": 40.65499980449677,
+    "depth": 3.2773232609033585,
+    "n": 11,
+    "title": "02  FLOORS & ROOFS"
+   },
+   {
+    "cat": "03_Doors_Windows",
+    "y": 12.437323275208474,
+    "x1": 24.165499961376188,
+    "depth": 3.950058326125145,
+    "n": 9,
+    "title": "03  DOORS & WINDOWS"
+   },
+   {
+    "cat": "04_Living",
+    "y": 20.78738160133362,
+    "x1": 36.25400006771088,
+    "depth": 1.100000023841858,
+    "n": 13,
+    "title": "04  LIVING ROOM"
+   },
+   {
+    "cat": "05_Bedroom",
+    "y": 26.287381625175477,
+    "x1": 17.941999912261963,
+    "depth": 2.1009998321533203,
+    "n": 7,
+    "title": "05  BEDROOM"
+   },
+   {
+    "cat": "06_Kitchen",
+    "y": 32.788381457328796,
+    "x1": 18.400000047683715,
+    "depth": 0.7000000178813934,
+    "n": 8,
+    "title": "06  KITCHEN"
+   },
+   {
+    "cat": "07_Bathroom",
+    "y": 37.88838147521019,
+    "x1": 9.0,
+    "depth": 1.9009999632835388,
+    "n": 4,
+    "title": "07  BATHROOM"
+   },
+   {
+    "cat": "08_Lights_Decor",
+    "y": 44.189381438493726,
+    "x1": 46.40802898406983,
+    "depth": 3.0,
+    "n": 19,
+    "title": "08  LIGHTS & DECOR"
+   },
+   {
+    "cat": "09_Exterior",
+    "y": 51.589381438493724,
+    "x1": 15.59999989271164,
+    "depth": 0.8999999761581421,
+    "n": 6,
+    "title": "09  EXTERIOR"
+   }
+  ],
+  "views": [
+   {
+    "id": "overview",
+    "label": "Overview",
+    "target": [
+     12.204,
+     0,
+     -26.445
+    ],
+    "orbit": [
+     0,
+     52,
+     62.57831955611706
+    ]
+   },
+   {
+    "id": "01_Structure",
+    "label": "01 STRUCTURE",
+    "target": [
+     18.001,
+     1.0,
+     -0.18
+    ],
+    "orbit": [
+     0,
+     72,
+     28.501499980688095
+    ]
+   },
+   {
+    "id": "02_Floors_Roofs",
+    "label": "02 FLOORS & ROOFS",
+    "target": [
+     19.327,
+     1.0,
+     -6.399
+    ],
+    "orbit": [
+     0,
+     72,
+     30.491249853372576
+    ]
+   },
+   {
+    "id": "03_Doors_Windows",
+    "label": "03 DOORS & WINDOWS",
+    "target": [
+     11.083,
+     1.0,
+     -14.412
+    ],
+    "orbit": [
+     0,
+     72,
+     18.124124971032142
+    ]
+   },
+   {
+    "id": "04_Living",
+    "label": "04 LIVING ROOM",
+    "target": [
+     17.127,
+     1.0,
+     -21.337
+    ],
+    "orbit": [
+     0,
+     72,
+     27.190500050783157
+    ]
+   },
+   {
+    "id": "05_Bedroom",
+    "label": "05 BEDROOM",
+    "target": [
+     7.971,
+     1.0,
+     -27.338
+    ],
+    "orbit": [
+     0,
+     72,
+     18
+    ]
+   },
+   {
+    "id": "06_Kitchen",
+    "label": "06 KITCHEN",
+    "target": [
+     8.2,
+     1.0,
+     -33.138
+    ],
+    "orbit": [
+     0,
+     72,
+     18
+    ]
+   },
+   {
+    "id": "07_Bathroom",
+    "label": "07 BATHROOM",
+    "target": [
+     3.5,
+     1.0,
+     -38.839
+    ],
+    "orbit": [
+     0,
+     72,
+     18
+    ]
+   },
+   {
+    "id": "08_Lights_Decor",
+    "label": "08 LIGHTS & DECOR",
+    "target": [
+     22.204,
+     1.0,
+     -45.689
+    ],
+    "orbit": [
+     0,
+     72,
+     34.80602173805237
+    ]
+   },
+   {
+    "id": "09_Exterior",
+    "label": "09 EXTERIOR",
+    "target": [
+     6.8,
+     1.0,
+     -52.039
+    ],
+    "orbit": [
+     0,
+     72,
+     18
+    ]
+   }
+  ]
+ },
+ "place": {
+  "scene": "Example_Place",
+  "views": [
+   {
+    "id": "overview",
+    "label": "Overview",
+    "target": [
+     32.0,
+     0.5,
+     2
+    ],
+    "orbit": [
+     0,
+     62,
+     78
+    ]
+   },
+   {
+    "id": "exterior",
+    "label": "1 Exterior",
+    "target": [
+     0.0,
+     2.0,
+     0
+    ],
+    "orbit": [
+     -35,
+     68,
+     22
+    ]
+   },
+   {
+    "id": "interior",
+    "label": "2 Interior (cutaway)",
+    "target": [
+     32.0,
+     0.8,
+     0
+    ],
+    "orbit": [
+     -35,
+     52,
+     17
+    ]
+   },
+   {
+    "id": "livingroom",
+    "label": "3 Living room",
+    "target": [
+     63.5,
+     0.9,
+     1.8
+    ],
+    "orbit": [
+     -35,
+     62,
+     9
+    ]
+   }
+  ]
+ }
+}

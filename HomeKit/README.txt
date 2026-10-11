@@ -13,11 +13,33 @@ HomeBuilderKit_Library.blend   Tous les assets rangés par catégories
                                ils apparaissent dans l'Asset Browser.
 Showcase_House.blend           La maison de démonstration assemblée
                                avec les pièces du pack (modifiable).
+Scenes/Showroom.blend / .glb   Le SHOWROOM : les 89 assets alignés par
+                               catégorie, sur socles, avec étiquettes.
+Scenes/Example_Place.blend/.glb  La scène d'EXEMPLE : maison + jardin
+                               (extérieur), maison en coupe (intérieur),
+                               salon / salle à manger / cuisine.
+Scenes/Renders/                Images des deux scènes (vues larges + détails)
+Viewer/index.html              Visualiseur 3D web autonome (voir ci-dessous)
 Individual_Assets/FBX/<cat>/   Un fichier .fbx par asset
 Individual_Assets/GLB/<cat>/   Un fichier .glb par asset (glTF binaire)
 Previews/                      Images de présentation
 ASSET_LIST.csv                 Liste : dimensions, triangles, matériaux
 LICENSE.txt                    Licence d'utilisation
+
+---------------------------------------------------------------------
+SCÈNES DE PRÉSENTATION & VISUALISEUR WEB
+---------------------------------------------------------------------
+Les fichiers Scenes/*.glb sont prévus pour la prévisualisation 3D sur
+un site web (glTF binaire, léger : Showroom ~7 Mo, Example_Place ~2 Mo).
+Viewer/index.html les affiche avec <model-viewer> (Google, licence
+Apache 2.0, fichier model-viewer.min.js inclus) : rotation, zoom, boutons
+de points de vue (vue d'ensemble, une par catégorie / une par zone).
+Pour tester en local, servez le dossier du pack, par exemple :
+    python -m http.server 8000     (puis ouvrir /Viewer/index.html)
+(les navigateurs bloquent le chargement de .glb depuis file://)
+Hébergement : copiez les dossiers Viewer/ et Scenes/ côte à côte sur votre
+site, ou intégrez la balise <model-viewer src="Scenes/Showroom.glb"> dans
+votre page. ?scene=place ouvre directement la scène d'exemple.
 
 ---------------------------------------------------------------------
 CATÉGORIES (89 assets)
