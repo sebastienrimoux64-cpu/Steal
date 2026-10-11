@@ -1,6 +1,6 @@
 # Steal — Les 9 bijū en cubes, rigés pour Blender
 
-Les 9 démons à queues de Naruto, **modélisés en cubes** (style blocs) avec un **squelette complet** (armature) et deux animations (`Idle`, `Walk`).
+Les 9 démons à queues de Naruto, **modélisés en voxels haute résolution** (blocs de 25 cm, pelage, dents, marques) avec un **squelette détaillé** (armature à 47–135 os selon le bijū), une déformation douce aux articulations et deux animations (`Idle`, `Walk`). Chaque bijū mesure plusieurs mètres de haut (échelle ×3 par rapport à la première version).
 
 | # | Bijū | Forme | Queues |
 |---|------|-------|:-----:|
@@ -23,13 +23,14 @@ Dans Blender : **File > Open** sur un `.blend`, ou **File > Import > FBX / glTF*
 
 ## Le rig
 Chaque modèle = un seul maillage (`<Nom>_Mesh`) skinné sur une armature (`<Nom>_Rig`) :
-`Root` > `Body` > `Neck` > `Head` > `Jaw`, oreilles `Ear.L/.R`, 4 pattes
-(`FrontLeg_Upper.L` > `_Lower.L` > `_Paw.L`), queues segmentées `TailN_K`
-(chaque segment est l'os enfant du précédent), plus des os spécifiques
-(cornes, ailes `Wing.L/.R`, antennes...).
+- colonne : `Root` > `Spine1` (hanches) > `Spine2` > `Spine3` (poitrail) > `Neck1` > `Neck2` > `Head`
+- tête : `Jaw` (mâchoire), `Tongue` (langue), `Eyelid.L/.R` (paupières, clignement), `Ear1/Ear2.L/.R` (oreilles à 2 os)
+- 4 pattes : `FrontLeg_Upper.L` > `_Lower.L` > `_Paw.L` > `_Toe1..3.L` (doigts avec griffes)
+- queues : `TailN_1` ... `TailN_10` (10 os par queue, déformation progressive le long de la queue)
+- os spécifiques : cornes, ailes `Wing.L/.R`, antennes, moustaches...
 Conventions : le bijū regarde vers **-Y**, côté gauche = **+X** (`.L`), 1 unité = 1 m.
 Pour animer : passez en **Pose Mode**, sélectionnez l'armature, et faites tourner les os.
-Actions fournies : `Idle` (respiration, queues, mâchoire) et `Walk` (cycle de marche).
+Actions fournies : `Idle` (respiration, clignement, oreilles, queues, mâchoire) et `Walk` (cycle de marche).
 
 ## Régénérer / modifier
 Python avec le module `bpy` (`pip install bpy`) :
@@ -38,4 +39,4 @@ python tools/make_bijuu.py            # les 9 bijū dans models/
 python tools/make_bijuu.py Kurama     # un seul
 python tools/render_preview.py models/Kurama.blend apercu.png   # rendu d'aperçu
 ```
-Chaque bijū est un dictionnaire dans `tools/make_bijuu.py` (tailles, couleurs, nombre de queues, détails).
+Chaque bijū est un dictionnaire dans `tools/make_bijuu.py` (tailles, couleurs, nombre de queues, détails). `Q` (taille d'un voxel) et `STUD` (échelle) en haut du fichier règlent la résolution et la taille.
