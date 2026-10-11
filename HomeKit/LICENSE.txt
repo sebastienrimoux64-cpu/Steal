@@ -1,0 +1,25 @@
+HOME BUILDER KIT — LICENCE D'UTILISATION
+========================================
+
+Vous pouvez, avec une licence valide :
+  - utiliser les assets dans des projets personnels ou commerciaux
+    (jeux vidéo, films, animations, rendus d'architecture, visuels,
+    applications, publicités...), sans redevance et sans mention obligatoire ;
+  - modifier les assets, les combiner avec d'autres, les texturer ;
+  - utiliser le pack dans votre équipe/entreprise selon le nombre de
+    licences achetées.
+
+Vous ne pouvez pas :
+  - revendre, redistribuer, partager ou publier le pack ou ses fichiers
+    sources (modèles originaux ou modifiés) tels quels, gratuitement
+    ou non, sur une place de marché, un dépôt public ou un site de partage ;
+  - proposer les assets comme "contenu" téléchargeable isolé dans un
+    produit (par exemple un pack d'assets concurrent) ;
+  - utiliser le pack pour entraîner un modèle d'intelligence artificielle
+    générative destiné à produire des assets 3D.
+
+Les assets sont fournis "tels quels", sans garantie. Le vendeur ne peut
+être tenu responsable des dommages liés à leur utilisation.
+
+[Remplacez cette licence par celle de votre choix avant de vendre :
+ ce texte est un modèle à adapter à votre site et à votre pays.]
