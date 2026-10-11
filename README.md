@@ -40,3 +40,9 @@ python tools/make_bijuu.py Kurama     # un seul
 python tools/render_preview.py models/Kurama.blend apercu.png   # rendu d'aperçu
 ```
 Chaque bijū est un dictionnaire dans `tools/make_bijuu.py` (tailles, couleurs, nombre de queues, détails). `Q` (taille d'un voxel) et `STUD` (échelle) en haut du fichier règlent la résolution et la taille.
+
+## Animation « chute » du personnage R6
+`models/R6_Chute.blend` : le personnage R6 (style Roblox) tombe d'une falaise de 40 unités (240 images à 60 i/s) : déséquilibre, bascule, chute libre avec culbute, impact sur le dos, rebonds. Caméra latérale qui suit la chute.
+- Généré par `python tools/make_chute_r6.py ENTREE.blend SORTIE.blend` (les rigs d'origine sont conservés, leurs contraintes sont mises en sourdine).
+- La texture du personnage (`R61Tex.png`) est externe : si elle apparaît en rose, faire **File > External Data > Find Missing Files**.
+- Aperçus : `apercu/R6_Chute_planche.png` (planche d'images clés) et `apercu/R6_Chute_image130.png`.
