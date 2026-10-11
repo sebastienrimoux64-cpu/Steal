@@ -1,47 +1,41 @@
-# Steal — Les 9 bijū en Parts Roblox
+# Steal — Les 9 bijū en cubes, rigés pour Blender
 
-Les 9 démons à queues de Naruto, **entièrement construits en Parts cubiques** et **rigés en Motor6D** :
+Les 9 démons à queues de Naruto, **modélisés en cubes** (style blocs) avec un **squelette complet** (armature) et deux animations (`Idle`, `Walk`).
 
-| # | Bijū | Forme | Particularités |
-|---|------|-------|----------------|
-| 1 | Shukaku | tanuki de sable | bandes bleues, touffes de sable |
-| 2 | Matatabi | chat | flammes bleues Neon |
-| 3 | Isobu | tortue | carapace à pointes |
-| 4 | Son Goku | singe rouge | crinière blanche, cornes |
-| 5 | Kokuo | cheval-dauphin | corne frontale, crinière rouge |
-| 6 | Saiken | limace | antennes, queues translucides |
-| 7 | Chomei | scarabée | corne, ailes mobiles |
-| 8 | Gyūki | taureau-pieuvre | cornes, 8 tentacules |
-| 9 | Kurama | renard | 9 queues, marques noires |
+| # | Bijū | Forme | Queues |
+|---|------|-------|:-----:|
+| 1 | Shukaku | tanuki de sable | 1 |
+| 2 | Matatabi | chat à flammes bleues | 2 |
+| 3 | Isobu | tortue à carapace piquante | 3 |
+| 4 | Son Goku | singe rouge à crinière | 4 |
+| 5 | Kokuo | cheval-dauphin à corne | 5 |
+| 6 | Saiken | limace | 6 |
+| 7 | Chomei | scarabée ailé | 7 |
+| 8 | Gyūki | taureau-pieuvre | 8 |
+| 9 | Kurama | renard | 9 |
 
-Chaque modèle contient : `Root` (PrimaryPart invisible), `Body`, `Neck`, `Head`, `Jaw`,
-`Ear*`, 4 pattes (`Upper` / `Lower` / `Paw` / griffes), des queues segmentées
-(`TailN_K`, chaque segment est un Motor6D enfant du précédent) et un
-`AnimationController` prêt pour l'éditeur d'animations.
+## Fichiers (dossier `models/`)
+- `Bijuu_Tous.blend` : les 9 dans une même scène.
+- `<Nom>.blend` : un bijū, avec armature et animations (ouvrir directement dans Blender).
+- `<Nom>.fbx` / `<Nom>.glb` : même modèle pour d'autres logiciels (Unity, Unreal, Godot...).
 
-## Installation
+Dans Blender : **File > Open** sur un `.blend`, ou **File > Import > FBX / glTF**.
 
-### Avec Rojo
-`rojo serve` puis connectez Studio (le fichier `default.project.json` est fourni).
+## Le rig
+Chaque modèle = un seul maillage (`<Nom>_Mesh`) skinné sur une armature (`<Nom>_Rig`) :
+`Root` > `Body` > `Neck` > `Head` > `Jaw`, oreilles `Ear.L/.R`, 4 pattes
+(`FrontLeg_Upper.L` > `_Lower.L` > `_Paw.L`), queues segmentées `TailN_K`
+(chaque segment est l'os enfant du précédent), plus des os spécifiques
+(cornes, ailes `Wing.L/.R`, antennes...).
+Conventions : le bijū regarde vers **-Y**, côté gauche = **+X** (`.L`), 1 unité = 1 m.
+Pour animer : passez en **Pose Mode**, sélectionnez l'armature, et faites tourner les os.
+Actions fournies : `Idle` (respiration, queues, mâchoire) et `Walk` (cycle de marche).
 
-### Sans Rojo (copier-coller)
-1. `ReplicatedStorage` → dossier **Bijuu** contenant 2 ModuleScripts : `BijuuBuilder` et `BijuuAnimator` (contenu de `src/shared/`).
-2. `ServerScriptService` → un **Script** avec `src/server/BuildBijuu.server.lua`.
-3. `StarterPlayerScripts` → un **LocalScript** avec `src/client/AnimateBijuu.client.lua`.
-4. Lancez Play : les 9 bijū apparaissent alignés dans `Workspace.Bijuu`.
-
-### Un seul bijū, depuis la barre de commande de Studio
-```lua
-local B = require(game.ReplicatedStorage.Bijuu.BijuuBuilder)
-B.build("Kurama", CFrame.new(0, 0, 0), workspace)
+## Régénérer / modifier
+Python avec le module `bpy` (`pip install bpy`) :
 ```
-Noms valides : `Shukaku Matatabi Isobu SonGoku Kokuo Saiken Chomei Gyuki Kurama`.
-
-## Animation
-`BijuuAnimator` (côté client) gère respiration, queues, tête, mâchoire, marche et ailes.
-Attributs du modèle : `Walking`, `Roar`, `Flying` (booléens).
-Pour des animations personnalisées, utilisez l'éditeur d'animations Roblox sur les Motor6D.
-
-## Personnaliser
-Chaque bijū est une table dans `SPECS` (`BijuuBuilder.lua`) : tailles, couleurs, nombre de
-queues, et une fonction `extras` pour les détails (cornes, carapace, ailes...).
+python tools/make_bijuu.py            # les 9 bijū dans models/
+python tools/make_bijuu.py Kurama     # un seul
+python tools/render_preview.py models/Kurama.blend apercu.png   # rendu d'aperçu
+```
+Chaque bijū est un dictionnaire dans `tools/make_bijuu.py` (tailles, couleurs, nombre de queues, détails).
