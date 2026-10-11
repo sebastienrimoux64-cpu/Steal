@@ -244,7 +244,7 @@ def build_showroom():
         xc = (r["x1"] - 3.0) / 2
         d = width * 0.72
         tag = f"{r['cat']}_Wide"
-        cams[tag] = add_camera("Cam_Row_" + tag, (xc, r["y"] - d, 2.4 + d * 0.30), (xc, r["y"] + r["depth"] * 0.3, 0.9), 24, (2400, 800))
+        cams[tag] = add_camera("Cam_Row_" + tag, (xc, r["y"] - d, 3.0 + d * 0.52), (xc, r["y"] + r["depth"] * 0.3, 0.9), 24, (2400, 800))
         # tronçons de détail (<= 17 m)
         n_seg = max(1, math.ceil((r["x1"] - 2) / 17.0))
         seg_len = (r["x1"] + 1.5) / n_seg
@@ -430,7 +430,7 @@ def build_livingroom(objs, coll, ox, oy):
 
 def build_example_place():
     objs = new_scene()
-    spacing = 32.0
+    spacing = 26.0
     zones = {
         "Exterior": make_coll("Zone_1_Exterior"),
         "Interior": make_coll("Zone_2_Interior_Cutaway"),
@@ -458,7 +458,7 @@ def build_example_place():
     cams["Exterior"] = add_camera("Cam_Exterior", (xa - 13, -17, 7.5), (xa, -0.5, 2.3), 30)
     cams["Interior"] = add_camera("Cam_Interior_Cutaway", (xb - 9.0, -11.0, 11.0), (xb + 0.2, 0.0, 0.6), 34)
     cams["LivingRoom"] = add_camera("Cam_LivingRoom", (xc - 5.2, -6.6, 4.0), (xc - 0.8, -1.8, 0.9), 34)
-    cams["Overview"] = add_camera("Cam_Overview", (xb - 3, -70, 38), (xb, -2, 1.0), 38, (2000, 700))
+    cams["Overview"] = add_camera("Cam_Overview", (xb, -50, 27), (xb, -3, 0.5), 25, (2400, 800))
     bpy.context.scene.camera = cams["Exterior"]
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(SCENES, "Example_Place.blend"))
     export_glb_all("Example_Place.glb")
