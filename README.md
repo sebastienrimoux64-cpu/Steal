@@ -46,3 +46,10 @@ Chaque bijū est un dictionnaire dans `tools/make_bijuu.py` (tailles, couleurs, 
 - Généré par `python tools/make_chute_r6.py ENTREE.blend SORTIE.blend` (les rigs d'origine sont conservés, leurs contraintes sont mises en sourdine).
 - La texture du personnage (`R61Tex.png`) est externe : si elle apparaît en rose, faire **File > External Data > Find Missing Files**.
 - Aperçus : `apercu/R6_Chute_planche.png` (planche d'images clés) et `apercu/R6_Chute_image130.png`.
+
+## Salto arrière (backflip) du personnage R6
+`models/R6_Salto_Arriere.blend` : 240 images à 60 i/s. Caméra de profil par défaut (`Camera_Profil`) et caméra trois-quarts (`Camera_TroisQuarts`), sol à damier (1 case = 1 u = 35 cm), soleil.
+- **Physique simulée** (`tools/make_salto_arriere_r6.py`, `--sim` pour voir les diagnostics) : accroupissement équilibré, poussée avec soulevé des talons, **décollage détecté par la physique** (le sol ne peut plus pousser quand l'accélération du centre de masse atteint -g), **chute libre exactement parabolique** (g = 28 u/s² pour un personnage de 1,75 m), **moment cinétique conservé** (la rotation accélère en position groupée, de 390 à 570 °/s, puis ralentit à l'ouverture), réception amortie.
+- Résultat : saut de 0,58 m, 0,71 s de vol, 338° de rotation avant le toucher, pieds sans glissement au contact, aucun morceau qui traverse le sol (vérifié sur la géométrie réelle des 240 images).
+- Les jambes R6 sont coupées en deux (cuisse / mollet) pour fléchir les genoux. Les rigs d'origine restent dans le fichier mais sont cachés.
+- Aperçus : `apercu/R6_Salto_Arriere.gif`, `apercu/R6_Salto_Arriere_planche.png`, `apercu/R6_Salto_physique.png` (hauteur du centre de masse vs parabole théorique, rotation, vitesse de rotation).
