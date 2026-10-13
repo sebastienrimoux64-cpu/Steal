@@ -62,7 +62,7 @@ Chaque bijū est un dictionnaire dans `tools/make_bijuu.py` (tailles, couleurs, 
 - Aperçus : `apercu/Shidou_Ciseau_Retourne.gif`, `apercu/Shidou_planche.png`, `apercu/Shidou_rendu_eevee.png`.
 
 ## Fruits du démon (One Piece) en cubes
-`models/Fruits_du_Demon.blend` : **26 fruits du démon en cubes**, chacun avec **sa propre forme** et la **peau à spirales** de l'œuvre. Présentoirs en gradins avec le nom de chaque fruit. Scène statique, faite avec Blender 5.2.
+`models/Fruits_du_Demon.blend` : **26 fruits du démon en cubes**, chacun avec **sa propre forme** et la peau de l'œuvre : **plein de petites spirales serrées** qui couvrent tout le fruit (motif de type *karakusa*, volutes « en S » dont les voisines tournent en sens inverse), et non quelques grosses spirales. Présentoirs en gradins avec le nom de chaque fruit. Scène statique, faite avec Blender 5.2.
 
 **Tout est fusionné pour être léger** :
 | | 1re version | maintenant |
@@ -72,7 +72,7 @@ Chaque bijū est un dictionnaire dans `tools/make_bijuu.py` (tailles, couleurs, 
 | poids du fichier | 2,5 Mo | **0,9 Mo** |
 
 - Chaque fruit est **un seul maillage** de gros cubes (27 cm) : toutes les faces voisines dans le même plan sont fondues en un seul grand rectangle, les faces cachées n'existent pas, les sommets sont partagés (~600 faces par fruit).
-- Les détails fins (spirales, taches du léopard, nervures des feuilles, côtes du cactus, fissures…) ne sont plus faits de milliers de petits cubes : ils sont **peints sur une seule petite texture pixelisée** (`Fruits_atlas`, 256×2048, rangée dans le fichier) partagée par les 26 fruits. Chaque pixel correspond à un cube de 9 cm du modèle détaillé. Les spirales sont donc à plat (plus en relief).
+- Les détails fins (petites spirales, taches du léopard, nervures des feuilles, côtes du cactus, fissures…) ne sont plus faits de milliers de petits cubes : ils sont **peints sur une seule petite texture pixelisée** (`Fruits_atlas`, 256×2048, rangée dans le fichier) partagée par les 26 fruits. Chaque pixel correspond à un cube de 9 cm du modèle détaillé. Les spirales sont donc à plat (plus en relief). Sur les fruits à segments (framboise, magma, grappe, ananas) chaque bosse ou écaille porte sa propre mini-spirale. Taille des spirales : constante `SWIRL` du script.
 - Les 26 présentoirs, leurs plateaux et leurs noms forment **un seul objet** (`Presentoirs`).
 - Plus fin (cubes de 18 cm, ~34 000 faces, ~1,6 Mo) : `python tools/make_fruits_demon.py SORTIE.blend --k=2`.
 

@@ -35,6 +35,8 @@ def _scale_arg(default):
 SCALE = _scale_arg(2.0)     # cubes par unité de forme : plus c'est grand, plus c'est fin (1 = cubes de 18 cm)
 VOX = 0.18 / SCALE          # taille d'un cube (u) ; 1 u = 35 cm
 RELIEF = 2                  # épaisseur (en cubes) du relief des spirales
+SWIRL = 2.6                 # rayon d'une petite spirale de la peau (unités de forme ; fruit ~ 22 u de large)
+TURNS_DENSE = 1.55          # nombre de tours d'une petite spirale
 LIGHT = (-0.4, -0.6, 0.7)   # direction de lumière « cuite » dans les couleurs (3 niveaux)
 
 
@@ -163,10 +165,12 @@ class Part:
     """Une partie d'un fruit : un ensemble de cubes + la façon de la colorer.
     mode : « swirl » (peau à spirales en relief), « fn » (colorateur personnalisé), « plain » (uni)."""
 
-    def __init__(self, vox, base, line=None, mode="swirl", center=(0, 0, 0), lf=None, nsw=7, rad=1.0, turns=2.4,
-                 first=None):
+    def __init__(self, vox, base, line=None, mode="swirl", center=(0, 0, 0), lf=None, nsw=7, rad=1.0, turns=None,
+                 first=None, sw=SWIRL):
+        # nsw > 1 : peau couverte de PETITES spirales (rayon sw, en unités de forme) ; nsw <= 1 : une seule spirale
         self.vox, self.base, self.line, self.mode = vox, base, line, mode
-        self.center, self.lf, self.nsw, self.rad, self.turns, self.first = center, lf, nsw, rad, turns, first
+        self.center, self.lf, self.nsw, self.rad, self.first, self.sw = center, lf, nsw, rad, first, sw
+        self.turns = turns if turns is not None else (TURNS_DENSE if nsw > 1 else 2.4)
         self.crack = None
 
 
@@ -191,54 +195,106 @@ def stem_T(base, h=3, half=4.5, right_curl=True, color=GREEN):
 
 
 # ======================================================================= spirales
-def swirl_centers(rng, n, rad, first=None):
-    """Centres de tourbillon sur la sphère ; le premier fait face à la caméra (-Y) sauf indication."""
-    f = unit(first) if first else unit((rng.uniform(-0.25, 0.25), -1.0, rng.uniform(0.1, 0.4)))
-    cs = [(f, 1.05 * rad, 1)]
-    off = rng.random() * 6.28
-    for i in range(n):
-        z = 1 - 2 * (i + 0.5) / n
-        a = i * 2.39996 + off
-        rr = math.sqrt(max(0.0, 1 - z * z))
-        d = unit((rr * math.cos(a), rr * math.sin(a), z))
-        if dot(d, f) > 0.55:
-            continue
-        cs.append((d, rng.uniform(0.62, 0.9) * rad, rng.choice((-1, 1))))
+def _basis(c):
+    up = (0.0, 0.0, 1.0) if abs(c[2]) < 0.9 else (1.0, 0.0, 0.0)
+    u = unit(cross(c, up))
+    return u, cross(c, u)
+
+
+def swirl_centers(rng, nsw, rad, first=None, rho=11.0, sw=SWIRL):
+    """Centres de volutes sur la sphère.
+    nsw <= 1 : une seule grande spirale (face à la caméra, ou dirigée par `first`).
+    nsw  > 1 : un semis régulier (spirale de Fibonacci, un peu secoué) de petites volutes de rayon `sw`,
+    de sens alternés (voisines opposées) : leurs bras se rejoignent comme les « S » du motif karakusa."""
+    if nsw <= 1:
+        f = unit(first) if first else unit((rng.uniform(-0.25, 0.25), -1.0, rng.uniform(0.1, 0.4)))
+        u, v = _basis(f)
+        return [(f, 1, u, v)], 1.05 * rad
+    ang = sw / rho                                                    # rayon angulaire d'une volute
+    d = 1.75 * ang                                                    # écart entre deux centres
+    n = max(8, int(4 * math.pi / (0.866 * d * d)))
+    cs = []
+    for c in fib(n):
+        j = (rng.uniform(-0.2, 0.2) * d, rng.uniform(-0.2, 0.2) * d, rng.uniform(-0.2, 0.2) * d)
+        cs.append(unit((c[0] + j[0], c[1] + j[1], c[2] + j[2])))
+    hs = []
+    for i, c in enumerate(cs):                                        # sens : l'opposé de la majorité des voisines déjà placées
+        votes = sum(hs[j] for j in range(i) if dot(c, cs[j]) > math.cos(1.5 * d))
+        hs.append(1 if votes < 0 else (-1 if votes > 0 else rng.choice((-1, 1))))
     out = []
-    for c, rd, h in cs:
-        up = (0.0, 0.0, 1.0) if abs(c[2]) < 0.9 else (1.0, 0.0, 0.0)
-        u = unit(cross(c, up))
-        v = cross(c, u)
-        out.append((c, rd, h, u, v))
-    return out
+    for c, h in zip(cs, hs):
+        u, v = _basis(c)
+        out.append((c, h, u, v))
+    return out, ang
 
 
-WIDTH = 0.28
+class SwirlField:
+    """Les volutes d'une partie, rangées dans une grille pour retrouver vite les voisines d'un point."""
 
+    def __init__(self, centers, ang, single, turns):
+        self.single, self.turns, self.ang = single, turns, ang
+        self.grid = {}
+        for idx, (c, h, u, v) in enumerate(centers):
+            key = tuple(int(math.floor((x + 1) * 2)) for x in c)
+            self.grid.setdefault(key, []).append(idx)
+        self.cs = centers
 
-def in_spiral(n, centers, turns):
-    best = None
-    for c, rd, h, u, v in centers:
-        r = math.acos(clamp(dot(n, c), -1.0, 1.0))
-        if r < rd:
-            rn = r / rd
+    def near(self, n):
+        if self.single:
+            return range(len(self.cs))
+        k = [int(math.floor((x + 1) * 2)) for x in n]
+        out = []
+        for a in (-1, 0, 1):
+            for b in (-1, 0, 1):
+                for c in (-1, 0, 1):
+                    out.extend(self.grid.get((k[0] + a, k[1] + b, k[2] + c), ()))
+        return out
+
+    def is_line(self, n, rho):
+        """Vrai si la direction n (point à la distance rho du centre) tombe sur un bras de spirale."""
+        rd = self.ang if self.single else clamp(self.ang * 11.0 / max(rho, 3.0), 0.7 * self.ang, 1.6 * self.ang)
+        cosr = math.cos(rd)
+        best = None
+        for idx in self.near(n):
+            c, h, u, v = self.cs[idx]
+            dd = dot(n, c)
+            if dd < cosr:
+                continue
+            rn = math.acos(clamp(dd, -1.0, 1.0)) / rd
             if best is None or rn < best[0]:
                 best = (rn, h, math.atan2(dot(n, v), dot(n, u)))
-    if best is None:
-        return False
-    rn, h, a = best
-    if rn < 0.06:
-        return True
-    s = rn * turns - h * a / (2 * math.pi)
-    return (s - math.floor(s)) < WIDTH and rn > 0.09
+        if best is None:
+            return False
+        rn, h, a = best
+        if rn < 0.07 and self.single:
+            return True
+        s = rn * self.turns - h * a / (2 * math.pi)
+        wd = WIDTH_SINGLE if self.single else WIDTH_DENSE
+        return (s - math.floor(s)) < wd and rn > (0.09 if self.single else 0.12)
+
+
+WIDTH_SINGLE, WIDTH_DENSE = 0.28, 0.42
 
 
 def shade(c, k):
     return tuple(clamp(v * k, 0.0, 1.0) for v in c)
 
 
+def lum(c):
+    return 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]
+
+
+def contrasted(base, line, gap=0.16):
+    """Écarte le trait de la peau s'ils sont trop proches (fruits pâles) : même teinte, un ton plus soutenu."""
+    if abs(lum(line) - lum(base)) >= gap:
+        return line
+    if lum(base) > 0.5:
+        return tuple(clamp(v * 0.74, 0.0, 1.0) for v in base)
+    return tuple(clamp(v * 1.35 + 0.12, 0.0, 1.0) for v in base)
+
+
 def qcol(c):
-    """Quantifie la couleur (6 bits par canal) pour que les faces voisines se fusionnent."""
+    """Quantifie la couleur (6 bits par canal) : moins de teintes, texture plus propre."""
     return tuple(round(clamp(v, 0.0, 1.0) * 63) / 63 for v in c)
 
 
@@ -261,7 +317,10 @@ def paint(parts, seed):
             occ[k] = pi
     for part in parts:
         if part.mode == "swirl":
-            part.cs = swirl_centers(rng, part.nsw, part.rad, part.first)
+            pts = [bc(k) for k in list(part.vox)[:400]] or [(1.0, 0.0, 0.0)]
+            rho = sum(math.dist(q, part.center) for q in pts) / len(pts)
+            cs, ang = swirl_centers(rng, part.nsw, part.rad, part.first, max(rho, 4.0), part.sw)
+            part.field = SwirlField(cs, ang, part.nsw <= 1, part.turns)
     out, raised = {}, {}
     patch = {}                                          # petite variation de teinte par plaques de 6 cubes
 
@@ -285,8 +344,9 @@ def paint(parts, seed):
             col = part.lf(p, n, rng)
             out[k] = qcol(shade(col if col is not None else base, lit))
             continue
-        if in_spiral(n, part.cs, part.turns):
-            out[k] = qcol(shade(part.line, lit))
+        if part.field.is_line(n, math.dist(p, part.center)):
+            line = contrasted(base, part.line) if not part.field.single else part.line
+            out[k] = qcol(shade(line, lit))
             ax = max(range(3), key=lambda i: abs(n[i]))                  # relief : des cubes en plus vers l'extérieur
             sg = 1 if n[ax] > 0 else -1
             q = list(k)
@@ -310,23 +370,32 @@ def paint(parts, seed):
 
 
 def lumps_fn(centers, rl, base, ring, dot_col=None):
-    """Colorateur « segments » : un point au sommet de chaque bosse et un anneau autour."""
+    """Colorateur « segments » : chaque bosse porte sa mini-spirale (sens alterné d'une bosse à l'autre)."""
+    info = []
+    for i, c in enumerate(centers):
+        ax = unit(c)
+        u, v = _basis(ax)
+        info.append((ax, u, v, 1 if i % 2 else -1))
+
     def f(p, n, rng):
-        best, bc_ = 1e9, None
-        for c in centers:
+        best, bi = 1e9, None
+        for i, c in enumerate(centers):
             d = math.sqrt((p[0] - c[0]) ** 2 + (p[1] - c[1]) ** 2 + (p[2] - c[2]) ** 2)
             if d < best:
-                best, bc_ = d, c
+                best, bi = d, i
         if best > rl * 1.15:
             return None
-        ax = unit(bc_)
-        dv = unit((p[0] - bc_[0], p[1] - bc_[1], p[2] - bc_[2]))
+        ax, u, v, h = info[bi]
+        c = centers[bi]
+        dv = unit((p[0] - c[0], p[1] - c[1], p[2] - c[2]))
         ang = math.acos(clamp(dot(ax, dv), -1.0, 1.0))
-        if dot_col and ang < 0.34:
+        rn = ang / 1.15
+        if rn > 1.0:
+            return None
+        if dot_col and rn < 0.1:
             return dot_col
-        if 0.72 < ang < 0.98 and (ang * 9) % 1 < 0.75:
-            return ring
-        return None
+        s = rn * 1.7 - h * math.atan2(dot(dv, v), dot(dv, u)) / (2 * math.pi)
+        return ring if (s - math.floor(s)) < 0.42 and rn > 0.1 else None
     return f
 
 
@@ -639,8 +708,14 @@ def f_tori():
         v = p[2] / 2.9
         a, b = math.floor(u), math.floor(v)
         fu, fv = u - a, v - b
-        if min(fu, 1 - fu, fv, 1 - fv) < 0.12:
+        if min(fu, 1 - fu, fv, 1 - fv) < 0.1:
             return (0.20, 0.45, 0.18)
+        x, y = fu - 0.5, fv - 0.5
+        r = math.hypot(x, y) * 2.0
+        h = 1 if (a + b) % 2 else -1
+        t = r * 1.6 - h * math.atan2(y, x) / (2 * math.pi)
+        if r < 0.92 and (t - math.floor(t)) < 0.42 and r > 0.12:
+            return (0.16, 0.38, 0.14)                                    # mini-spirale de l'écaille
         return light if (a + b) % 2 == 0 else green
     spikes = set()
     for ring, z in enumerate([-10.5 + 2.6 * i for i in range(9)]):
