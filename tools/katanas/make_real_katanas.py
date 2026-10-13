@@ -49,20 +49,22 @@ def ring_frame(zb):
 
 
 def build_blade(bm, mat_body, mat_edge):
-    """Section : spine (u=+w/2), shinogi (u=+0.12w), hamon (ligne ondulée sur le biseau), tranchant (u=-w/2)."""
+    """Section : spine (u=+w/2), shinogi (u=+0.12w), hamon (ligne ondulée sur le biseau), tranchant (u=-w/2).
+    Chaque pan est une bande à sommets propres, lissée dans le sens de la longueur : arêtes vives entre pans,
+    surface continue (sans facettes ni « pixels ») le long de la lame."""
+    n = 260
     rings = []
-    n = 150
     for i in range(n + 1):
         s = i / n
         zb = L_BLADE * s
         w = W0 * (1 - 0.30 * s)
         t = T0 * (1 - 0.35 * s)
         k = max(0.0, (s - TIP_START) / (1 - TIP_START))        # kissaki
-        # pointe oblique : la section se replie vers le dos
         sc_u = (1 - k) ** 0.8 + 0.015
         sc_v = (1 - k * k) + 0.02
-        hm = -w / 2 + w * (0.26 + 0.12 * hnoise(zb))            # position (u) du hamon, ondule
-        pts = [(w / 2, t / 2), (w / 2, -t / 2), (0.12 * w, -t / 2), (hm, -t * 0.22), (-w / 2, 0.0), (hm, t * 0.22), (0.12 * w, t / 2)]
+        hu = -w / 2 + w * (0.26 + 0.12 * hnoise(zb))            # position (u) du hamon, ondule
+        hv = t / 2 * (hu + w / 2) / (0.12 * w + w / 2)           # même plan que le biseau : pas de facette
+        pts = [(w / 2, t / 2), (w / 2, -t / 2), (0.12 * w, -t / 2), (hu, -hv), (-w / 2, 0.0), (hu, hv), (0.12 * w, t / 2)]
         c, sn = ring_frame(zb)
         cx = blade_center(zb)
         ring = []
@@ -71,12 +73,19 @@ def build_blade(bm, mat_body, mat_edge):
             v2 = v * sc_v
             ring.append(Vector((cx + u2 * c, v2, Z_BLADE0 + zb - u2 * sn)))
         rings.append(ring)
-    faces = G.loft(bm, rings, mat=mat_body, flat=True)
-    # faces par segment : 7 faces par tranche ; bande hamon = faces (hamon -> tranchant -> hamon) -> indices 3 et 4
-    for idx, f in enumerate(faces[:n * 7]):
-        if idx % 7 in (3, 4):
-            f.material_index = mat_edge
-    return faces
+    m = len(rings[0])
+    for j in range(m):
+        mat = mat_edge if j in (3, 4) else mat_body
+        vs = [(bm.verts.new(r[j]), bm.verts.new(r[(j + 1) % m])) for r in rings]
+        for i in range(n):
+            f = bm.faces.new((vs[i][0], vs[i][1], vs[i + 1][1], vs[i + 1][0]))
+            f.material_index = mat
+            f.smooth = True
+    for r, flip in ((rings[0], True), (rings[-1], False)):
+        vv = [bm.verts.new(p) for p in r]
+        f = bm.faces.new(list(reversed(vv)) if flip else vv)
+        f.material_index = mat_body
+        f.smooth = False
 
 
 def oval_ring(cx, cz, a, b, n=36, p=2.2):
@@ -208,16 +217,16 @@ def cfg(name):
                     core=lambda: M.wood("Tsuka_Oak", *P.OAK, ring_dir="Z", scale=300), wrap=lambda: M.rope("Wrap_Rope", (0.62, 0.48, 0.28)),
                     kashira=lambda: M.wood("Kashira_Walnut", *P.WALNUT, ring_dir="Z", scale=300), label="bois (bokken)")
     if name == "Iron":
-        steel = lambda: M.metal("Steel_Blade", (0.62, 0.64, 0.68), (0.42, 0.44, 0.48), (0.10, 0.22), scratch=0.65, edge=(0.95, 0.96, 1.0), aniso=0.0)
-        return dict(body=steel, edge=lambda: M.metal("Steel_Hamon", (0.92, 0.94, 0.98), (0.78, 0.80, 0.85), (0.06, 0.14), scratch=0.4, edge=(1, 1, 1)),
+        steel = lambda: M.metal("Steel_Blade", (0.62, 0.64, 0.68), (0.42, 0.44, 0.48), (0.10, 0.22), scratch=0.1, edge=(0.95, 0.96, 1.0), aniso=0.0)
+        return dict(body=steel, edge=lambda: M.metal("Steel_Hamon", (0.92, 0.94, 0.98), (0.78, 0.80, 0.85), (0.06, 0.14), scratch=0.05, edge=(1, 1, 1)),
                     tsuba=lambda: M.metal("Tsuba_Iron", (0.16, 0.16, 0.18), (0.09, 0.09, 0.11), (0.28, 0.5), rust=dict(color=(0.35, 0.14, 0.06), amount=0.25)),
                     tsuba2=lambda: M.metal("Seppa_Brass", (0.80, 0.58, 0.22), (0.62, 0.42, 0.14), (0.25, 0.45)),
                     habaki=lambda: M.metal("Habaki_Brass", (0.88, 0.66, 0.26), (0.7, 0.5, 0.17), (0.18, 0.35), scratch=0.3),
                     core=lambda: M.leather("Samegawa", (0.82, 0.80, 0.72)), wrap=lambda: M.leather("Ito_Black", (0.025, 0.025, 0.03)),
                     kashira=lambda: M.metal("Kashira_Iron", (0.16, 0.16, 0.18), (0.09, 0.09, 0.11), (0.28, 0.5)), label="fer (acier)")
     if name == "Gold":
-        return dict(body=lambda: M.metal("Gold_Blade", (1.0, 0.78, 0.30), (0.95, 0.64, 0.17), (0.08, 0.2), edge=(1.0, 0.93, 0.62), scratch=0.3),
-                    edge=lambda: M.metal("Gold_Hamon", (1.0, 0.88, 0.50), (1.0, 0.78, 0.32), (0.05, 0.12), edge=(1.0, 0.97, 0.78), scratch=0.2),
+        return dict(body=lambda: M.metal("Gold_Blade", (1.0, 0.78, 0.30), (0.95, 0.64, 0.17), (0.08, 0.2), edge=(1.0, 0.93, 0.62), scratch=0.05),
+                    edge=lambda: M.metal("Gold_Hamon", (1.0, 0.88, 0.50), (1.0, 0.78, 0.32), (0.05, 0.12), edge=(1.0, 0.97, 0.78), scratch=0.03),
                     tsuba=lambda: M.metal("Tsuba_Gold", (0.95, 0.70, 0.22), (0.78, 0.52, 0.12), (0.14, 0.32), scratch=0.4),
                     tsuba2=lambda: M.metal("Seppa_Gold", (1.0, 0.8, 0.34), (0.9, 0.62, 0.16), (0.14, 0.3)),
                     habaki=lambda: M.metal("Habaki_Gold", (1.0, 0.8, 0.34), (0.9, 0.62, 0.16), (0.14, 0.3)),

@@ -181,7 +181,7 @@ def metal(name, base, base2, rough=(0.22, 0.42), scratch=0.55, edge=(1, 1, 1), p
     rmap = mb.n("ShaderNodeMapRange"); rmap.inputs["To Min"].default_value = rough[0]; rmap.inputs["To Max"].default_value = rough[1]
     mb.link(rn2, "Fac", rmap, "Value")
     rsum = mb.math("ADD", (rmap, "Result"), None)
-    rscr = mb.math("MULTIPLY", (scr_sum, "Value"), 0.18)
+    rscr = mb.math("MULTIPLY", (scr_sum, "Value"), 0.18 * min(1.0, scratch / 0.55))
     mb.link(rscr, "Value", rsum, 1)
     rfinal = rsum
     if patina or rust:
