@@ -1,13 +1,22 @@
-"""Fruits du démon (One Piece) en cubes : chaque fruit a SA forme, et ses spirales en relief.
+"""Fruits du démon (One Piece) en cubes : chaque fruit a SA forme, ses spirales en relief, et un maillage léger.
 
 Usage :
-    python tools/make_fruits_demon.py SORTIE.blend [SORTIE.glb]
+    python tools/make_fruits_demon.py SORTIE.blend                 # version COMPACTE (par défaut, ~1 Mo)
+    python tools/make_fruits_demon.py SORTIE.blend --mode=mesh --scale=1.4   # vrai maillage optimisé (export)
+    python tools/make_fruits_demon.py --stats                      # compte les cubes / faces, sans Blender
 
 Les formes suivent les descriptions de l'œuvre (cœur, poire, fraise à cornes, tête de léopard, cactus,
-framboise, yo-yo, régime de lames, ananas…). Chaque fruit est un seul maillage de cubes de 18 cm : seules les
-faces visibles sont créées, les couleurs sont stockées dans l'attribut de couleur « Col ». Les spirales
-(motif de peau de tous les fruits) sont de vrais reliefs : les cubes de la spirale sont recolorés ET
-surélevés d'un cube.
+framboise, yo-yo, régime de lames, ananas…). Les spirales (motif de peau de tous les fruits) sont de vrais
+reliefs : les cubes de la spirale sont recolorés ET surélevés.
+
+Détail et poids :
+  * les cubes sont petits (SCALE = 2 : 9 cm) pour des spirales et des silhouettes fines ;
+  * mode « gn » (par défaut) : le fichier ne contient qu'UN POINT COLORÉ PAR CUBE visible (les cubes cachés à
+    l'intérieur n'existent pas) ; un modificateur « Nœuds de géométrie » (partagé par tous les fruits) fabrique
+    les cubes à l'ouverture. Résultat : ~1 Mo pour les 26 fruits. Pour obtenir un maillage classique :
+    Objet > Appliquer > Modificateur visuel ;
+  * mode « mesh » : vrai maillage « glouton » (les faces voisines de même couleur sont fusionnées, les sommets
+    partagés, une couleur par face), adapté à l'export vers d'autres logiciels.
 
 Sources : descriptions des wikis (One Piece Wiki et dérivés) retrouvées par recherche web. Certains fruits
 ont des designs contradictoires selon les sources, ou non officiels (voir README) ; les couleurs varient
@@ -17,10 +26,22 @@ import math
 import random
 import sys
 
-VOX = 0.18            # taille d'un cube (u)
+def _scale_arg(default):
+    for a in sys.argv[1:]:
+        if a.startswith("--scale="):
+            return float(a.split("=", 1)[1])
+    return default
+
+
+SCALE = _scale_arg(2.0)     # cubes par unité de forme : plus c'est grand, plus c'est fin (1 = cubes de 18 cm)
+VOX = 0.18 / SCALE          # taille d'un cube (u) ; 1 u = 35 cm
+RELIEF = 2                  # épaisseur (en cubes) du relief des spirales
+LIGHT = (-0.4, -0.6, 0.7)   # direction de lumière « cuite » dans les couleurs (3 niveaux)
 
 
 # ======================================================================= primitives voxels
+# Les formes sont décrites en unités « de forme » (flottantes) ; un cube est une clé entière (i, j, k)
+# = coordonnées / SCALE.
 def clamp(x, a, b):
     return max(a, min(b, x))
 
@@ -38,18 +59,41 @@ def cross(a, b):
     return (a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0])
 
 
-def region(lo, hi):
-    for x in range(int(math.floor(lo[0])), int(math.ceil(hi[0])) + 1):
-        for y in range(int(math.floor(lo[1])), int(math.ceil(hi[1])) + 1):
-            for z in range(int(math.floor(lo[2])), int(math.ceil(hi[2])) + 1):
-                yield x, y, z
+def grid(lo, hi):
+    """Cubes dont le centre est dans la boîte [lo, hi] : renvoie (clé entière, coordonnées de forme)."""
+    for i in range(int(math.floor(lo[0] * SCALE)), int(math.ceil(hi[0] * SCALE)) + 1):
+        x = i / SCALE
+        for j in range(int(math.floor(lo[1] * SCALE)), int(math.ceil(hi[1] * SCALE)) + 1):
+            y = j / SCALE
+            for k in range(int(math.floor(lo[2] * SCALE)), int(math.ceil(hi[2] * SCALE)) + 1):
+                yield (i, j, k), (x, y, k / SCALE)
+
+
+def bc(key):
+    return (key[0] / SCALE, key[1] / SCALE, key[2] / SCALE)
+
+
+def filt(S, pred):
+    return {k for k in S if pred(*bc(k))}
+
+
+def zmax(S):
+    return max(k[2] for k in S) / SCALE
+
+
+def zmin(S):
+    return min(k[2] for k in S) / SCALE
+
+
+def top_z(S, x=0.0, y=0.0):
+    i, j = round(x * SCALE), round(y * SCALE)
+    return max(k[2] for k in S if k[0] == i and k[1] == j) / SCALE
 
 
 def ell(c, r):
-    """Ellipsoïde de centre c et de demi-axes r."""
     cx, cy, cz = c
     rx, ry, rz = r
-    return {(x, y, z) for x, y, z in region((cx - rx, cy - ry, cz - rz), (cx + rx, cy + ry, cz + rz))
+    return {k for k, (x, y, z) in grid((cx - rx, cy - ry, cz - rz), (cx + rx, cy + ry, cz + rz))
             if ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 + ((z - cz) / rz) ** 2 <= 1}
 
 
@@ -58,72 +102,69 @@ def capsule(p0, p1, r0, r1=None, sy=1.0):
     r1 = r0 if r1 is None else r1
     d = (p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2])
     L2 = dot(d, d) or 1.0
-    m = max(r0, r1) + 1.5
-    S = set()
+    m = max(r0, r1) + 1.0
+    out = set()
     lo = (min(p0[0], p1[0]) - m, min(p0[1], p1[1]) - m, min(p0[2], p1[2]) - m)
     hi = (max(p0[0], p1[0]) + m, max(p0[1], p1[1]) + m, max(p0[2], p1[2]) + m)
-    for x, y, z in region(lo, hi):
+    for k, (x, y, z) in grid(lo, hi):
         t = clamp(((x - p0[0]) * d[0] + (y - p0[1]) * d[1] + (z - p0[2]) * d[2]) / L2, 0.0, 1.0)
         cx, cy, cz = p0[0] + d[0] * t, p0[1] + d[1] * t, p0[2] + d[2] * t
         rr = r0 + (r1 - r0) * t
         if (x - cx) ** 2 + ((y - cy) * sy) ** 2 + (z - cz) ** 2 <= rr * rr:
-            S.add((x, y, z))
-    return S
+            out.add(k)
+    return out
 
 
 def path(points, r0, r1=None, sy=1.0):
     r1 = r0 if r1 is None else r1
-    S = set()
+    out = set()
     n = len(points) - 1
     for i in range(n):
         a = r0 + (r1 - r0) * i / n
         b = r0 + (r1 - r0) * (i + 1) / n
-        S |= capsule(points[i], points[i + 1], a, b, sy)
-    return S
+        out |= capsule(points[i], points[i + 1], a, b, sy)
+    return out
 
 
 def box(lo, hi):
-    return {(x, y, z) for x, y, z in region(lo, hi)}
+    return {k for k, _ in grid(lo, hi)}
 
 
-def fib(n, zmin=-1.0, zmax=1.0):
-    """n directions réparties sur la sphère (spirale de Fibonacci), z dans [zmin, zmax]."""
+def fib(n, zmin_=-1.0, zmax_=1.0):
+    """n directions réparties sur la sphère (spirale de Fibonacci), z dans [zmin_, zmax_]."""
     out = []
     for i in range(n):
-        z = zmax - (zmax - zmin) * (i + 0.5) / n
+        z = zmax_ - (zmax_ - zmin_) * (i + 0.5) / n
         rr = math.sqrt(max(0.0, 1 - z * z))
         a = i * 2.399963
         out.append((rr * math.cos(a), rr * math.sin(a), z))
     return out
 
 
-def top_z(S, x=0, y=0):
-    return max(z for (a, b, z) in S if a == x and b == y)
-
-
 def pear(c, r_bulb, r_top, dz_top, thr=1.05):
     """Poire : deux sphères fondues (métaballes)."""
     cx, cy, cz = c
-    S = set()
     zr = max(r_bulb, r_top + dz_top) * 1.35
-    for x, y, z in region((cx - r_bulb - 2, cy - r_bulb - 2, cz - zr), (cx + r_bulb + 2, cy + r_bulb + 2, cz + zr)):
+    out = set()
+    for k, (x, y, z) in grid((cx - r_bulb - 1, cy - r_bulb - 1, cz - zr), (cx + r_bulb + 1, cy + r_bulb + 1, cz + zr)):
         d1 = (x - cx) ** 2 + (y - cy) ** 2 + (z - cz) ** 2
         d2 = (x - cx) ** 2 + (y - cy) ** 2 + (z - cz - dz_top) ** 2
         if r_bulb ** 2 / (d1 + 0.01) + r_top ** 2 / (d2 + 0.01) >= thr:
-            S.add((x, y, z))
-    return S
+            out.add(k)
+    return out
 
 
 # ======================================================================= couleurs / parties
 GREEN = (0.28, 0.50, 0.18)
 LEAF = (0.36, 0.64, 0.22)
+VEIN = (0.22, 0.42, 0.15)
 
 
 class Part:
     """Une partie d'un fruit : un ensemble de cubes + la façon de la colorer.
     mode : « swirl » (peau à spirales en relief), « fn » (colorateur personnalisé), « plain » (uni)."""
 
-    def __init__(self, vox, base, line=None, mode="swirl", center=(0, 0, 0), lf=None, nsw=6, rad=1.0, turns=2.4,
+    def __init__(self, vox, base, line=None, mode="swirl", center=(0, 0, 0), lf=None, nsw=7, rad=1.0, turns=2.4,
                  first=None):
         self.vox, self.base, self.line, self.mode = vox, base, line, mode
         self.center, self.lf, self.nsw, self.rad, self.turns, self.first = center, lf, nsw, rad, turns, first
@@ -134,17 +175,20 @@ def plain(vox, col):
     return Part(vox, col, None, "plain")
 
 
+def leaf(c, r, color=LEAF):
+    """Feuille : ellipsoïde aplati avec une nervure centrale plus sombre."""
+    def lf(p, n, rng):
+        return VEIN if abs(p[1] - c[1]) < 0.45 and n[2] > 0.35 else None
+    return Part(ell(c, r), color, None, "fn", c, lf=lf)
+
+
 def stem_T(base, h=3, half=4.5, right_curl=True, color=GREEN):
     x, y, z = base
-    S = capsule((x, y, z - 1), (x, y, z + h), 1.1)
-    S |= capsule((x - half, y, z + h), (x + half, y, z + h), 1.0)
+    out = capsule((x, y, z - 1), (x, y, z + h), 1.1)
+    out |= capsule((x - half, y, z + h), (x + half, y, z + h), 1.0)
     if right_curl:
-        S |= path([(x + half, y, z + h), (x + half + 2, y, z + h + 1.5), (x + half + 3.5, y, z + h + 0.5)], 0.9, 0.7)
-    return plain(S, color)
-
-
-def leaf(c, r, color=LEAF):
-    return plain(ell(c, r), color)
+        out |= path([(x + half, y, z + h), (x + half + 2, y, z + h + 1.5), (x + half + 3.5, y, z + h + 0.5)], 0.9, 0.7)
+    return plain(out, color)
 
 
 # ======================================================================= spirales
@@ -170,7 +214,7 @@ def swirl_centers(rng, n, rad, first=None):
     return out
 
 
-WIDTH = 0.30
+WIDTH = 0.28
 
 
 def in_spiral(n, centers, turns):
@@ -184,17 +228,29 @@ def in_spiral(n, centers, turns):
     if best is None:
         return False
     rn, h, a = best
-    if rn < 0.07:
+    if rn < 0.06:
         return True
     s = rn * turns - h * a / (2 * math.pi)
-    return (s - math.floor(s)) < WIDTH and rn > 0.10
+    return (s - math.floor(s)) < WIDTH and rn > 0.09
 
 
 def shade(c, k):
     return tuple(clamp(v * k, 0.0, 1.0) for v in c)
 
 
+def qcol(c):
+    """Quantifie la couleur (6 bits par canal) pour que les faces voisines se fusionnent."""
+    return tuple(round(clamp(v, 0.0, 1.0) * 63) / 63 for v in c)
+
+
 NEIGH = [(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)]
+LU = unit(LIGHT)
+
+
+def baked(n):
+    """Éclairage cuit en 3 niveaux : le dessus est un peu plus clair, le dessous plus sombre."""
+    d = dot(n, LU)
+    return 1.09 if d > 0.62 else (0.86 if d < -0.15 else 1.0)
 
 
 def paint(parts, seed):
@@ -202,63 +258,73 @@ def paint(parts, seed):
     rng = random.Random(seed)
     occ = {}
     for pi, part in enumerate(parts):
-        for p in part.vox:
-            occ[p] = pi
+        for k in part.vox:
+            occ[k] = pi
     for part in parts:
         if part.mode == "swirl":
             part.cs = swirl_centers(rng, part.nsw, part.rad, part.first)
     out, raised = {}, {}
-    for p, pi in occ.items():
-        if all((p[0] + d[0], p[1] + d[1], p[2] + d[2]) in occ for d in NEIGH):
+    patch = {}                                          # petite variation de teinte par plaques de 6 cubes
+
+    def pj(k):
+        key = (k[0] // 6, k[1] // 6, k[2] // 6)
+        if key not in patch:
+            patch[key] = 1 + rng.uniform(-0.035, 0.035)
+        return patch[key]
+    for k, pi in occ.items():
+        if all((k[0] + d[0], k[1] + d[1], k[2] + d[2]) in occ for d in NEIGH):
             continue                                                     # intérieur : invisible
         part = parts[pi]
-        jit = 1 + rng.uniform(-0.05, 0.05)
+        p = bc(k)
         base = part.base(p) if callable(part.base) else part.base
         if part.mode == "plain":
-            out[p] = shade(base, jit)
+            out[k] = qcol(shade(base, pj(k)))
             continue
         n = unit((p[0] - part.center[0], p[1] - part.center[1], p[2] - part.center[2]))
+        lit = baked(n) * pj(k)
         if part.mode == "fn":
             col = part.lf(p, n, rng)
-            out[p] = shade(col if col is not None else base, jit)
+            out[k] = qcol(shade(col if col is not None else base, lit))
             continue
         if in_spiral(n, part.cs, part.turns):
-            out[p] = shade(part.line, jit)
-            ax = max(range(3), key=lambda i: abs(n[i]))                  # relief : un cube de plus vers l'extérieur
-            q = list(p)
-            q[ax] += 1 if n[ax] > 0 else -1
-            q = tuple(q)
-            if q not in occ:
-                raised[q] = shade(part.line, jit * 1.08)
+            out[k] = qcol(shade(part.line, lit))
+            ax = max(range(3), key=lambda i: abs(n[i]))                  # relief : des cubes en plus vers l'extérieur
+            sg = 1 if n[ax] > 0 else -1
+            q = list(k)
+            for layer in range(RELIEF):
+                q[ax] += sg
+                if tuple(q) in occ:
+                    break
+                raised[tuple(q)] = qcol(shade(part.line, lit * (1.06 + 0.02 * layer)))
         else:
-            out[p] = shade(base, jit)
+            out[k] = qcol(shade(base, lit))
     out.update(raised)
-    for part in parts:                                                    # fissures, etc. appliquées après coup
+    for part in parts:                                                    # fissures, côtes, etc. appliquées après coup
         if part.crack:
-            for p in list(out):
-                if p in part.vox:
-                    col = part.crack(p)
+            for k in list(out):
+                if k in part.vox:
+                    col = part.crack(bc(k))
                     if col is not None:
-                        out[p] = col
+                        out[k] = qcol(col)
     return out
 
 
 def lumps_fn(centers, rl, base, ring, dot_col=None):
     """Colorateur « segments » : un point au sommet de chaque bosse et un anneau autour."""
     def f(p, n, rng):
-        best, bc = 1e9, None
+        best, bc_ = 1e9, None
         for c in centers:
             d = math.sqrt((p[0] - c[0]) ** 2 + (p[1] - c[1]) ** 2 + (p[2] - c[2]) ** 2)
             if d < best:
-                best, bc = d, c
+                best, bc_ = d, c
         if best > rl * 1.15:
             return None
-        ax = unit(bc)
-        dv = unit((p[0] - bc[0], p[1] - bc[1], p[2] - bc[2]))
+        ax = unit(bc_)
+        dv = unit((p[0] - bc_[0], p[1] - bc_[1], p[2] - bc_[2]))
         ang = math.acos(clamp(dot(ax, dv), -1.0, 1.0))
         if dot_col and ang < 0.34:
             return dot_col
-        if 0.72 < ang < 0.98 and (ang * 9) % 1 < 0.7:
+        if 0.72 < ang < 0.98 and (ang * 9) % 1 < 0.75:
             return ring
         return None
     return f
@@ -277,123 +343,123 @@ def f_mera():
     body = ell((0, 0, -1), (10, 10, 9))
     tongues = (capsule((0, 0, 4), (1.5, 0, 22), 6.0, 0.4) | capsule((-5, 0, 3), (-9.5, 0, 15), 4.6, 0.4)
                | capsule((5, 0, 3), (8.5, 0, 17), 4.6, 0.4) | capsule((0, -4.5, 2), (-0.5, -6, 12), 4.0, 0.4)
-               | capsule((0, 4.5, 3), (1, 6, 14), 4.0, 0.4))
+               | capsule((0, 4.5, 3), (1, 6, 14), 4.0, 0.4) | capsule((-3, 3, 3), (-5, 4, 12), 3.2, 0.4)
+               | capsule((3, -3, 3), (5, -4.5, 13), 3.2, 0.4))
     orange, yellow = (0.96, 0.44, 0.08), (1.0, 0.80, 0.18)
 
     def base(p):
         t = clamp((p[2] - 6) / 16.0, 0.0, 1.0)
         return tuple(a + (b - a) * t for a, b in zip(orange, yellow))
-    return [Part(body | tongues, base, (0.80, 0.12, 0.05), center=(0, 0, 3), nsw=5)]
+    return [Part(body | tongues, base, (0.80, 0.12, 0.05), center=(0, 0, 3), nsw=6)]
 
 
-def heart_set(k, rot=0.0, c=(0, 0, 0)):
-    S = set()
+def heart_set(k_, rot=0.0, c=(0, 0, 0)):
     ca, sa = math.cos(rot), math.sin(rot)
-    for x, y, z in region((c[0] - 1.35 * k, c[1] - k, c[2] - 1.35 * k), (c[0] + 1.35 * k, c[1] + k, c[2] + 1.5 * k)):
+    out = set()
+    for key, (x, y, z) in grid((c[0] - 1.35 * k_, c[1] - k_, c[2] - 1.35 * k_), (c[0] + 1.35 * k_, c[1] + k_, c[2] + 1.5 * k_)):
         dx, dz = x - c[0], z - c[2]
-        X, Z, Y = (dx * ca + dz * sa) / k, (-dx * sa + dz * ca) / k, (y - c[1]) / k
+        X, Z, Y = (dx * ca + dz * sa) / k_, (-dx * sa + dz * ca) / k_, (y - c[1]) / k_
         if (X * X + 2.25 * Y * Y + Z * Z - 1) ** 3 - X * X * Z ** 3 - 0.1125 * Y * Y * Z ** 3 <= 0:
-            S.add((x, y, z))
-    return S
+            out.add(key)
+    return out
 
 
 def f_ope():
     """Un cœur rouge, tige verte en T."""
-    S = heart_set(8.6)
-    zt = max(z for (x, y, z) in S) - 4
+    S_ = heart_set(8.6)
+    zt = zmax(S_) - 4
     stem = plain(capsule((0, 0, zt - 1), (0, 0, zt + 4), 1.1) | capsule((-4.5, 0, zt + 4), (4.5, 0, zt + 4), 1.0), GREEN)
-    return [Part(S, (0.80, 0.07, 0.12), (1.0, 0.50, 0.55), nsw=5), stem]
+    return [Part(S_, (0.80, 0.07, 0.12), (1.0, 0.50, 0.55), nsw=6), stem]
 
 
 def f_mero():
     """Deux petits cœurs (un rouge, un violet) dont les tiges se rejoignent."""
     a = heart_set(6.4, rot=math.radians(-18), c=(-6.6, 0, 0))
     b = heart_set(6.4, rot=math.radians(18), c=(6.6, 0, 0))
-    za = max(z for (x, y, z) in a)
+    za = zmax(a)
     stems = (path([(-6.0, 0, za - 3), (-4.5, 0, za + 1), (-2, 0, za + 4), (0, 0, za + 6)], 0.9)
              | path([(6.0, 0, za - 3), (4.5, 0, za + 1), (2, 0, za + 4), (0, 0, za + 6)], 0.9)
              | capsule((0, 0, za + 6), (0, 0, za + 9), 1.0))
     return [Part(a, (0.88, 0.08, 0.14), (1.0, 0.55, 0.60), center=(-6.6, 0, 0), nsw=3, rad=0.9),
             Part(b, (0.55, 0.20, 0.66), (0.85, 0.60, 0.92), center=(6.6, 0, 0), nsw=3, rad=0.9),
-            plain(stems, GREEN)]
+            plain(stems, GREEN), leaf((1.8, 0, za + 8), (2.8, 1.0, 1.1))]
 
 
 def f_ito():
     """Poire lilas à tige fuchsia en tire-bouchon."""
-    S = pear((0, 0, 0), 11, 6.8, 9.5)
-    zt = top_z(S)
+    S_ = pear((0, 0, 0), 11, 6.8, 9.5)
+    zt = top_z(S_)
     pts = []
-    for i in range(26):
-        t = i / 25
+    for i in range(34):
+        t = i / 33
         a = t * 2.6 * 2 * math.pi
         pts.append((2.4 * math.cos(a) * (1 - 0.3 * t), 2.4 * math.sin(a) * (1 - 0.3 * t), zt - 1 + 11 * t))
-    return [Part(S, (0.80, 0.68, 0.93), (0.96, 0.90, 1.0), center=(0, 0, 3)),
+    return [Part(S_, (0.80, 0.68, 0.93), (0.96, 0.90, 1.0), center=(0, 0, 3)),
             plain(path(pts, 0.95, 0.7), (0.86, 0.12, 0.55))]
 
 
 def f_doru():
     """Poire blanche dont le sommet fond comme une bougie : creux de cire, coulures, mèche."""
-    S = pear((0, 0, 0), 11, 7.2, 9.0)
-    ztop = top_z(S) - 1
-    S = {p for p in S if p[2] <= ztop}
-    for p in list(S):
-        if p[2] >= ztop - 1 and p[0] ** 2 + p[1] ** 2 <= 4.6 ** 2:
-            S.discard(p)
+    S_ = pear((0, 0, 0), 11, 7.2, 9.0)
+    ztop = top_z(S_) - 1
+    S_ = filt(S_, lambda x, y, z: z <= ztop and not (z >= ztop - 1 and x * x + y * y <= 4.6 ** 2))
     rad_at = {}
-    for (x, y, z) in S:
-        rad_at[z] = max(rad_at.get(z, 0.0), math.hypot(x, y))
+    for k in S_:
+        x, y, z = bc(k)
+        rad_at[k[2]] = max(rad_at.get(k[2], 0.0), math.hypot(x, y))
     rng = random.Random(5)
     drips = set()
-    for k in range(11):
-        a = k * 2 * math.pi / 11 + rng.uniform(-0.2, 0.2)
+    for q in range(13):
+        a = q * 2 * math.pi / 13 + rng.uniform(-0.2, 0.2)
         ln = rng.randint(4, 12)
-        for j in range(ln):
-            z = ztop - j
-            if z in rad_at:
-                rr = rad_at[z] + 0.6
-                drips |= ell((rr * math.cos(a), rr * math.sin(a), z), (1.3, 1.3, 0.8))
-        if ztop - ln in rad_at:
-            rr = rad_at[ztop - ln] + 0.9
-            drips |= ell((rr * math.cos(a), rr * math.sin(a), ztop - ln), (1.8, 1.8, 1.6))
+        for j in range(int(ln * SCALE)):
+            kz = round(ztop * SCALE) - j
+            if kz in rad_at:
+                rr = rad_at[kz] + 0.6
+                drips |= ell((rr * math.cos(a), rr * math.sin(a), kz / SCALE), (1.3, 1.3, 0.8))
+        kz = round(ztop * SCALE) - int(ln * SCALE)
+        if kz in rad_at:
+            rr = rad_at[kz] + 0.9
+            drips |= ell((rr * math.cos(a), rr * math.sin(a), kz / SCALE), (1.8, 1.8, 1.6))
     wick = capsule((0, 0, ztop - 2), (0, 0, ztop + 3), 0.8)
-    return [Part(S, (0.97, 0.97, 0.95), (0.80, 0.82, 0.86), center=(0, 0, 3), nsw=5),
+    return [Part(S_, (0.97, 0.97, 0.95), (0.80, 0.82, 0.86), center=(0, 0, 3), nsw=6),
             plain(drips, (1.0, 0.86, 0.50)), plain(wick, (0.20, 0.12, 0.10))]
 
 
 def f_ushi():
     """Fraise noire coiffée de deux cornes blanc cassé."""
-    S = set()
-    for x, y, z in region((-13, -13, -15), (13, 13, 15)):
+    def inside(x, y, z):
         t = z / 13.0
         if abs(t) >= 1:
-            continue
+            return False
         rr = 12.0 * math.sqrt(1 - t * t) * (0.55 + 0.45 * clamp((z + 13) / 22.0, 0.0, 1.0))
-        if x * x + y * y <= rr * rr:
-            S.add((x, y, z))
-    zt = top_z(S)
+        return x * x + y * y <= rr * rr
+    S_ = {k for k, (x, y, z) in grid((-13, -13, -15), (13, 13, 15)) if inside(x, y, z)}
+    zt = top_z(S_)
     horns = set()
     for s in (-1, 1):
         horns |= path([(s * 10, 0, zt - 6), (s * 14.5, 0, zt - 4), (s * 17, 0, zt + 1.5), (s * 15.5, 0, zt + 6.5)], 2.3, 0.5)
     calyx = set()
-    for k in range(6):
-        a = k * math.pi / 3
+    for k in range(7):
+        a = k * 2 * math.pi / 7
         calyx |= capsule((0, 0, zt), (5.5 * math.cos(a), 5.5 * math.sin(a), zt + 1.2), 1.7, 0.7)
-    return [Part(S, (0.07, 0.07, 0.10), (0.30, 0.30, 0.38), nsw=6),
+    return [Part(S_, (0.07, 0.07, 0.10), (0.30, 0.30, 0.38), nsw=7),
             plain(horns, (0.95, 0.92, 0.82)), plain(calyx, LEAF), plain(capsule((0, 0, zt), (0, 0, zt + 4), 1.0), GREEN)]
 
 
 def f_neko():
-    """Tête de léopard : oreilles à spirales, taches, museau, tige en T recourbée."""
+    """Tête de léopard : oreilles à spirales, taches en rosettes, museau, tige en T recourbée."""
     head = ell((0, 0, 0), (12.5, 9.5, 10))
     snout = ell((0, -8, -3.5), (5.5, 3.6, 3.6))
     rng = random.Random(21)
-    spots = [(rng.uniform(-10, 10), rng.uniform(-9, 3), rng.uniform(-6, 8)) for _ in range(16)]
-    sizes = [rng.uniform(1.9, 2.8) for _ in spots]
+    spots = [(rng.uniform(-10, 10), rng.uniform(-9, 3), rng.uniform(-6, 8)) for _ in range(20)]
+    sizes = [rng.uniform(1.7, 2.7) for _ in spots]
 
     def lf(p, n, r):
-        for s, sz in zip(spots, sizes):
-            if (p[0] - s[0]) ** 2 + (p[1] - s[1]) ** 2 + (p[2] - s[2]) ** 2 < sz * sz:
-                return (0.30, 0.17, 0.08)
+        for s_, sz in zip(spots, sizes):
+            d2 = (p[0] - s_[0]) ** 2 + (p[1] - s_[1]) ** 2 + (p[2] - s_[2]) ** 2
+            if d2 < sz * sz:
+                return (0.30, 0.17, 0.08) if d2 > (0.45 * sz) ** 2 else (0.80, 0.52, 0.18)      # rosette : anneau + cœur
         return None
     parts = [Part(head, (0.95, 0.76, 0.30), None, "fn", (0, 0, 0), lf=lf), plain(snout, (0.99, 0.90, 0.68))]
     for s in (-1, 1):
@@ -406,9 +472,9 @@ def f_neko():
 
 def f_nikyu():
     """Fruit rose chair avec trois bosses au sommet (patte), tige en T."""
-    S = ell((0, 0, 0), (12, 11, 11))
+    S_ = ell((0, 0, 0), (12, 11, 11))
     lumps = ell((-7, 0, 10.5), (4.4, 4, 4)) | ell((0, 0, 13), (4.6, 4.2, 4.4)) | ell((7, 0, 10.5), (4.4, 4, 4))
-    return [Part(S, (0.97, 0.72, 0.66), (0.80, 0.42, 0.40), nsw=6),
+    return [Part(S_, (0.97, 0.72, 0.66), (0.80, 0.42, 0.40), nsw=7),
             Part(lumps, (0.92, 0.55, 0.55), (0.70, 0.30, 0.34), center=(0, 0, 11), nsw=1, rad=1.2, turns=1.5),
             stem_T((0, 0, 16.5), h=3, half=4)]
 
@@ -417,55 +483,54 @@ def f_hana():
     """Fleur rose (dahlia) : cœur et couronnes de pétales, tige verte."""
     core = ell((0, 0, 0), (8.5, 8.5, 7.5))
     petals = set()
-    for i, d in enumerate(fib(54, -0.35, 1.0)):
+    for i, d in enumerate(fib(70, -0.35, 1.0)):
         ln = 15.5 if i % 2 == 0 else 13
         tip = (d[0] * ln, d[1] * ln, d[2] * ln * 0.9 + 1)
-        petals |= capsule((d[0] * 6, d[1] * 6, d[2] * 5.5), tip, 3.0, 0.7)
-    top = max(z for (_, _, z) in petals | core)
-    return [Part(petals, lambda p: (0.96, 0.60, 0.76) if p[2] < 9 else (0.99, 0.72, 0.84), (0.78, 0.25, 0.50), nsw=4, turns=2.0),
+        petals |= capsule((d[0] * 6, d[1] * 6, d[2] * 5.5), tip, 2.7, 0.6)
+    top = zmax(petals | core)
+    return [Part(petals, lambda p: (0.96, 0.60, 0.76) if p[2] < 9 else (0.99, 0.72, 0.84), (0.78, 0.25, 0.50), nsw=5, turns=2.0),
             Part(core, (0.82, 0.22, 0.45), (1.0, 0.80, 0.50), nsw=3),
             plain(capsule((0, 0, top - 2), (0, 0, top + 4), 1.1), GREEN), leaf((2.5, 0, top + 2), (3.0, 1.0, 1.2))]
 
 
 def f_suna():
     """Cactus tonneau beige à côtes et épines, avec deux petits bras dressés, tige verte en T."""
-    body = set()
-    for x, y, z in region((-13, -13, -14), (13, 13, 14)):
+    def inside(x, y, z):
         phi = math.atan2(y, x)
         k = 1 - 0.12 * (0.5 + 0.5 * math.cos(8 * phi))
-        if (x / (11.0 * k)) ** 2 + (y / (11.0 * k)) ** 2 + (z / 12.5) ** 2 <= 1:
-            body.add((x, y, z))
+        return (x / (11.0 * k)) ** 2 + (y / (11.0 * k)) ** 2 + (z / 12.5) ** 2 <= 1
+    body = {k for k, (x, y, z) in grid((-13, -13, -14), (13, 13, 14)) if inside(x, y, z)}
     arms = set()
     for s_ in (-1, 1):
         arms |= path([(s_ * 9.5, 0, -2), (s_ * 13.6, 0, 0), (s_ * 13.6, 0, 12)], 3.4, 3.2)
         arms |= ell((s_ * 13.6, 0, 12.5), (3.2, 3.2, 2.6))
 
     def ribs(p):
-        if p not in body:
+        if round(p[0] * SCALE) == 0 and round(p[1] * SCALE) == 0:
             return None
         c = math.cos(8 * math.atan2(p[1], p[0]))
-        if c < -0.9:
+        if c < -0.9 and abs(p[0]) < 11.5 and abs(p[2]) < 12:
             return (0.58, 0.44, 0.24)                                    # fond des côtes
-        if c > 0.93 and p[2] % 3 == 0:
+        if c > 0.95 and round(p[2] * SCALE) % 6 == 0 and abs(p[2]) < 11 and math.hypot(p[0], p[1]) > 8:
             return (1.0, 0.97, 0.82)                                     # épines
         return None
-    part = Part(body | arms, (0.86, 0.72, 0.46), (0.62, 0.46, 0.24), nsw=6)
+    part = Part(body | arms, (0.86, 0.72, 0.46), (0.62, 0.46, 0.24), nsw=7)
     part.crack = ribs
     return [part, stem_T((0, 0, 12.2), h=3, half=4.5)]
 
 
 def f_bara():
     """Ovale fait de petites boules (framboise / mini ananas), couronne de feuilles."""
-    cs = [(d[0] * 7.6, d[1] * 7.6, d[2] * 10.6) for d in fib(64)]
+    cs = [(d[0] * 7.8, d[1] * 7.8, d[2] * 10.8) for d in fib(96)]
     vox = ell((0, 0, 0), (8.5, 8.5, 11.5))
     for c in cs:
-        vox |= ell(c, (3.5, 3.5, 3.5))
+        vox |= ell(c, (3.1, 3.1, 3.1))
     orange = (0.92, 0.32, 0.14)
     crown = set()
-    for k in range(5):
-        a = k * 2 * math.pi / 5
-        crown |= capsule((0, 0, 10), (4.5 * math.cos(a), 4.5 * math.sin(a), 15), 1.6, 0.5)
-    return [Part(vox, orange, None, "fn", lf=lumps_fn(cs, 3.5, orange, (0.62, 0.12, 0.08), (0.99, 0.80, 0.30))),
+    for k in range(6):
+        a = k * 2 * math.pi / 6
+        crown |= capsule((0, 0, 10), (4.5 * math.cos(a), 4.5 * math.sin(a), 15), 1.5, 0.5)
+    return [Part(vox, orange, None, "fn", lf=lumps_fn(cs, 3.1, orange, (0.62, 0.12, 0.08), (0.99, 0.80, 0.30))),
             plain(crown, LEAF)]
 
 
@@ -473,38 +538,38 @@ def f_mochi():
     """Rond crème, étranglé en bas puis évasé en un pied plat de mochi."""
     bulb = ell((0, 0, 6), (10.8, 10.8, 9.5))
     neck = capsule((0, 0, -5), (0, 0, 0.5), 5.2)
-    foot = {p for p in ell((0, 0, -7.5), (10, 10, 5)) if p[2] >= -11}
-    return [Part(bulb | neck | foot, (0.99, 0.94, 0.84), (0.95, 0.66, 0.60), center=(0, 0, 2), nsw=6),
+    foot = filt(ell((0, 0, -7.5), (10, 10, 5)), lambda x, y, z: z >= -11)
+    return [Part(bulb | neck | foot, (0.99, 0.94, 0.84), (0.95, 0.66, 0.60), center=(0, 0, 2), nsw=7),
             plain(path([(0, 0, 14), (0, 0, 16.5), (1.4, 0, 18.5), (3.2, 0, 19)], 1.2, 0.9), GREEN)]
 
 
 def f_bomu():
     """Pomme violet foncé façon bombe : tige en corde jaune effilochée, mèche allumée."""
-    S = {p for p in ell((0, 0, 0), (11.5, 11.5, 11)) if not (p[0] ** 2 + p[1] ** 2 + (p[2] - 12.5) ** 2 <= 4.2 ** 2)}
+    S_ = filt(ell((0, 0, 0), (11.5, 11.5, 11)), lambda x, y, z: not (x * x + y * y + (z - 12.5) ** 2 <= 4.2 ** 2))
     rope = path([(0, 0, 8.5), (0, 0, 13), (1.6, 0, 16.5), (3.8, 0, 18.5)], 1.5, 1.2)
     rng = random.Random(8)
     frays = set()
-    for _ in range(9):
+    for _ in range(13):
         a = rng.uniform(0, 6.28)
-        frays |= capsule((3.8, 0, 18.5), (3.8 + 2.2 * math.cos(a), 2.2 * math.sin(a), 20.5 + rng.uniform(0, 1.8)), 0.7, 0.2)
-    spark = ell((4.6, 0, 21.2), (1.4, 1.4, 1.4)) | ell((3.2, 0, 22.2), (1.0, 1.0, 1.0))
-    return [Part(S, (0.30, 0.12, 0.40), (0.66, 0.40, 0.84), nsw=6),
+        frays |= capsule((3.8, 0, 18.5), (3.8 + 2.4 * math.cos(a), 2.4 * math.sin(a), 20.5 + rng.uniform(0, 2.0)), 0.7, 0.2)
+    spark = ell((4.6, 0, 21.2), (1.4, 1.4, 1.4)) | ell((3.2, 0, 22.2), (1.0, 1.0, 1.0)) | ell((5.6, 1.4, 22.8), (0.7, 0.7, 0.7))
+    return [Part(S_, (0.30, 0.12, 0.40), (0.66, 0.40, 0.84), nsw=7),
             plain(rope | frays, (0.95, 0.80, 0.28)), plain(spark, (1.0, 0.45, 0.10))]
 
 
 def f_gura():
     """Poire bleue fissurée dans sa moitié basse (comme les fissures de son pouvoir)."""
-    S = pear((0, 0, -2), 11.5, 6.4, 11.5)
-    zb = min(z for (_, _, z) in S)
-    zt = top_z(S)
+    S_ = pear((0, 0, -2), 11.5, 6.4, 11.5)
+    zb = zmin(S_)
+    zt = top_z(S_)
     rng = random.Random(3)
     cracks = []
     for k in range(5):
         ph = k * 2 * math.pi / 5 + rng.uniform(-0.3, 0.3)
         cr = []
-        for j in range(20):
+        for j in range(26):
             ph += rng.uniform(-0.22, 0.22)
-            cr.append((zb + 0.5 + j * 0.8, ph))
+            cr.append((zb + 0.5 + j * 0.62, ph))
         cracks.append(cr)
 
     def crack(p):
@@ -512,10 +577,10 @@ def f_gura():
         rr = max(math.hypot(p[0], p[1]), 3)
         for cr in cracks:
             for z, ph in cr:
-                if abs(p[2] - z) <= 0.75 and abs(math.atan2(math.sin(phi - ph), math.cos(phi - ph))) * rr < 1.7:
+                if abs(p[2] - z) <= 0.62 and abs(math.atan2(math.sin(phi - ph), math.cos(phi - ph))) * rr < 1.45:
                     return (0.04, 0.08, 0.22)
         return None
-    body = Part(S, (0.30, 0.55, 0.95), (0.68, 0.84, 1.0), center=(0, 0, 3), nsw=6)
+    body = Part(S_, (0.30, 0.55, 0.95), (0.68, 0.84, 1.0), center=(0, 0, 3), nsw=7)
     body.crack = crack
     return [body, plain(capsule((0, 0, zt - 1), (0, 0, zt + 5), 1.1), GREEN), leaf((2.8, 0, zt + 3.2), (3.0, 1.0, 1.2))]
 
@@ -524,43 +589,43 @@ def f_goro():
     """Néflier jaune doré effilé vers la tige, hérissé de pointes d'éclair ; tige verte en zigzag."""
     body = ell((0, 0, -1.5), (10.5, 10.5, 11)) | capsule((0, 0, 5), (0, 0, 15.5), 8.0, 2.6)
     sparks = set()
-    for d in fib(34, -0.5, 0.9):
-        sparks |= capsule((d[0] * 9.5, d[1] * 9.5, d[2] * 10 - 1.5), (d[0] * 14, d[1] * 14, d[2] * 14 - 1.5), 1.5, 0.3)
+    for d in fib(46, -0.5, 0.9):
+        sparks |= capsule((d[0] * 9.5, d[1] * 9.5, d[2] * 10 - 1.5), (d[0] * 14, d[1] * 14, d[2] * 14 - 1.5), 1.4, 0.3)
     zt = top_z(body)
     zig = path([(0, 0, zt - 1), (2.2, 0, zt + 2), (-1.4, 0, zt + 4.5), (2.8, 0, zt + 7.5), (-0.6, 0, zt + 9.5)], 1.0, 0.8)
     bar = capsule((-3.5, 0, zt + 1.5), (3.5, 0, zt + 1.5), 0.9)
-    return [Part(body, (0.99, 0.84, 0.22), (1.0, 0.97, 0.62), nsw=5),
+    return [Part(body, (0.99, 0.84, 0.22), (1.0, 0.97, 0.62), nsw=6),
             plain(sparks, (1.0, 0.98, 0.72)), plain(zig | bar, GREEN)]
 
 
 def f_magu():
     """Boule rouge sombre faite de grosses bosses, chacune avec son tourbillon orange ; tige orange en vrille."""
-    cs = [(d[0] * 8.2, d[1] * 8.2, d[2] * 8.2) for d in fib(28)]
+    cs = [(d[0] * 8.2, d[1] * 8.2, d[2] * 8.2) for d in fib(38)]
     vox = ell((0, 0, 0), (9.5, 9.5, 9.5))
     for c in cs:
-        vox |= ell(c, (5.2, 5.2, 5.2))
+        vox |= ell(c, (4.6, 4.6, 4.6))
     dark = (0.42, 0.04, 0.04)
     helix = []
-    for i in range(24):
-        a = i / 23 * 2.2 * 2 * math.pi
-        helix.append((2.2 * math.cos(a), 2.2 * math.sin(a), 13 + 9 * i / 23))
-    return [Part(vox, dark, None, "fn", lf=lumps_fn(cs, 5.2, dark, (1.0, 0.52, 0.10), (1.0, 0.75, 0.2))),
+    for i in range(32):
+        a = i / 31 * 2.2 * 2 * math.pi
+        helix.append((2.2 * math.cos(a), 2.2 * math.sin(a), 13 + 9 * i / 31))
+    return [Part(vox, dark, None, "fn", lf=lumps_fn(cs, 4.6, dark, (1.0, 0.52, 0.10), (1.0, 0.75, 0.2))),
             plain(path(helix, 1.0, 0.7), (0.95, 0.50, 0.10))]
 
 
 def f_yami():
     """Grosse boule violet pâle faite de nombreuses gouttes pointues (grappe / ananas), feuilles vertes."""
-    dirs = fib(60)
+    dirs = fib(84)
     centers = [(d[0] * 8.8, d[1] * 8.8, d[2] * 8.8) for d in dirs]
     vox = ell((0, 0, 0), (9.5, 9.5, 9.5))
     for c, d in zip(centers, dirs):
-        vox |= ell(c, (3.6, 3.6, 3.6)) | capsule(c, (d[0] * 14.2, d[1] * 14.2, d[2] * 14.2), 3.4, 0.5)
+        vox |= ell(c, (3.1, 3.1, 3.1)) | capsule(c, (d[0] * 13.8, d[1] * 13.8, d[2] * 13.8), 2.9, 0.4)
     pale = (0.66, 0.56, 0.86)
     crown = set()
-    for k in range(6):
-        a = k * math.pi / 3
-        crown |= capsule((0, 0, 11), (6 * math.cos(a), 6 * math.sin(a), 17), 1.9, 0.5)
-    return [Part(vox, pale, None, "fn", lf=lumps_fn([tuple(v * 1.3 for v in c) for c in centers], 4.6, pale, (0.38, 0.28, 0.62))),
+    for k in range(7):
+        a = k * 2 * math.pi / 7
+        crown |= capsule((0, 0, 11), (6 * math.cos(a), 6 * math.sin(a), 17), 1.8, 0.5)
+    return [Part(vox, pale, None, "fn", lf=lumps_fn([tuple(v * 1.3 for v in c) for c in centers], 4.0, pale, (0.38, 0.28, 0.62))),
             plain(crown, LEAF)]
 
 
@@ -570,26 +635,26 @@ def f_tori():
     green, light = (0.36, 0.66, 0.30), (0.58, 0.82, 0.42)
 
     def lf(p, n, r):
-        u = math.atan2(p[1], p[0]) * 10.0 / 3.4
-        v = p[2] / 3.4
+        u = math.atan2(p[1], p[0]) * 10.0 / 2.9
+        v = p[2] / 2.9
         a, b = math.floor(u), math.floor(v)
         fu, fv = u - a, v - b
-        if min(fu, 1 - fu, fv, 1 - fv) < 0.14:
+        if min(fu, 1 - fu, fv, 1 - fv) < 0.12:
             return (0.20, 0.45, 0.18)
         return light if (a + b) % 2 == 0 else green
     spikes = set()
-    for ring, z in enumerate(range(-10, 12, 3)):
+    for ring, z in enumerate([-10.5 + 2.6 * i for i in range(9)]):
         rz = 9.4 * math.sqrt(max(0.0, 1 - (z / 13) ** 2))
-        for k in range(11):
-            a = (k + 0.5 * (ring % 2)) * 2 * math.pi / 11
+        for k in range(13):
+            a = (k + 0.5 * (ring % 2)) * 2 * math.pi / 13
             c = (math.cos(a) * rz, math.sin(a) * rz, z)
-            spikes |= capsule(c, (c[0] * 1.22, c[1] * 1.22, c[2] + 0.5), 1.5, 0.3)
+            spikes |= capsule(c, (c[0] * 1.2, c[1] * 1.2, c[2] + 0.5), 1.3, 0.3)
     parts = [Part(body | spikes, green, None, "fn", lf=lf)]
-    for k in range(8):
-        a = k * 2 * math.pi / 8
+    for k in range(10):
+        a = k * 2 * math.pi / 10
         col = (0.16, 0.50, 0.98) if k % 2 == 0 else (1.0, 0.85, 0.2)
         parts.append(plain(capsule((0.6 * math.cos(a), 0.6 * math.sin(a), 12),
-                                   (6.5 * math.cos(a), 6.5 * math.sin(a), 24 + (k % 2) * 3), 2.0, 0.4), col))
+                                   (6.5 * math.cos(a), 6.5 * math.sin(a), 24 + (k % 2) * 3), 1.9, 0.4), col))
     return parts
 
 
@@ -599,7 +664,7 @@ def f_yomi():
     for sx in (-1, 1):
         for sy in (-1, 1):
             feet |= ell((sx * 6.4, sy * 6.4, -10), (3.8, 3.8, 3.4))
-    return [Part(ell((0, 0, 0), (11.5, 11.5, 11)) | feet, (0.88, 0.66, 0.22), (0.55, 0.34, 0.08), nsw=6),
+    return [Part(ell((0, 0, 0), (11.5, 11.5, 11)) | feet, (0.88, 0.66, 0.22), (0.55, 0.34, 0.08), nsw=7),
             plain(path([(0, 0, 9), (0, 0, 13), (1.4, 0, 15.5)], 1.2, 0.9), GREEN), leaf((-2.6, 0, 13.4), (3.0, 1.0, 1.2))]
 
 
@@ -609,29 +674,29 @@ def f_kage():
     for c, d in (((-9.5, 0, 6), (-1, 0, 0.9)), ((-11, -3, 2.5), (-1, -0.5, 0.2)), ((-11, 3, 2.5), (-1, 0.5, 0.2))):
         dd = unit(d)
         leaves |= ell(c, (3.2, 3.0, 3.0)) | capsule(c, (c[0] + dd[0] * 6, c[1] + dd[1] * 6, c[2] + dd[2] * 6), 3.0, 0.4)
-    return [Part(ell((0, 0, 0), (11.5, 11.5, 11)), (0.05, 0.05, 0.07), (0.32, 0.32, 0.40), nsw=6),
+    return [Part(ell((0, 0, 0), (11.5, 11.5, 11)), (0.05, 0.05, 0.07), (0.32, 0.32, 0.40), nsw=7),
             plain(path([(0, 0, 9), (0, 0, 13), (1.4, 0, 15.5), (3.4, 0, 16)], 1.2, 0.9), GREEN),
             plain(leaves, (0.30, 0.62, 0.25))]
 
 
 def f_hobi():
     """Yo-yo : deux disques jaunes à noyau en spirale, enveloppe rouge, tige en huit couché (clé de remontage)."""
-    discs_l = {p for p in box((-7.5, -11, -11), (-4.5, 11, 11)) if p[1] ** 2 + p[2] ** 2 <= 10.5 ** 2}
-    discs_r = {p for p in box((4.5, -11, -11), (7.5, 11, 11)) if p[1] ** 2 + p[2] ** 2 <= 10.5 ** 2}
-    rim = {p for p in box((-4, -12, -12), (4, 12, 12)) if p[1] ** 2 + p[2] ** 2 <= 11.8 ** 2}
+    discs_l = filt(box((-7.5, -11, -11), (-4.5, 11, 11)), lambda x, y, z: y * y + z * z <= 10.5 ** 2)
+    discs_r = filt(box((4.5, -11, -11), (7.5, 11, 11)), lambda x, y, z: y * y + z * z <= 10.5 ** 2)
+    rim = filt(box((-4, -12, -12), (4, 12, 12)), lambda x, y, z: y * y + z * z <= 11.8 ** 2)
     eight = []
-    for i in range(41):
-        t = i / 40 * 2 * math.pi
+    for i in range(53):
+        t = i / 52 * 2 * math.pi
         den = 1 + math.sin(t) ** 2
         eight.append((4.8 * math.cos(t) / den, 0, 16.2 + 5.9 * math.sin(t) * math.cos(t) / den))
-    return [Part(rim, (0.86, 0.10, 0.12), (0.55, 0.04, 0.06), nsw=6),
+    return [Part(rim, (0.86, 0.10, 0.12), (0.55, 0.04, 0.06), nsw=7),
             Part(discs_l, (0.98, 0.95, 0.60), (0.88, 0.70, 0.18), center=(-6, 0, 0), nsw=0, rad=1.3, turns=2.2, first=(-1, 0, 0)),
             Part(discs_r, (0.98, 0.95, 0.60), (0.88, 0.70, 0.18), center=(6, 0, 0), nsw=0, rad=1.3, turns=2.2, first=(1, 0, 0)),
             plain(capsule((0, 0, 9), (0, 0, 14), 1.3), GREEN), plain(path(eight, 0.95), GREEN)]
 
 
 def f_supa():
-    """Régime de bananes dont chaque « banane » est une lame de sabre ; dos émoussé à spirales, tranchant clair."""
+    """Régime de bananes dont chaque « banane » est une lame de sabre ; tranchant clair, lignes ondulées, spirales bleues."""
     blades = set()
     spine, edge = (0.36, 0.39, 0.47), (0.82, 0.85, 0.90)
     for dx in (-12, -6, 0, 6, 12):
@@ -641,43 +706,42 @@ def f_supa():
     def base(p):
         wave = 0.5 + 0.5 * math.sin(p[2] * 0.7 + p[0] * 0.35)
         return spine if wave > 0.78 else edge
-    return [Part(blades, base, (0.14, 0.24, 0.56), center=(0, 0, 4), nsw=7, rad=0.75, turns=2.0),
+    return [Part(blades, base, (0.14, 0.24, 0.56), center=(0, 0, 4), nsw=8, rad=0.75, turns=2.0),
             plain(capsule((0, 0, -15), (0, 0, -10), 1.8), (0.45, 0.60, 0.25))]
 
 
 def f_sube():
     """Pêche rose brillante avec sa fente, spirales en S, tige verte et feuille."""
-    S = set()
-    for x, y, z in region((-13, -13, -13), (13, 13, 13)):
+    def inside(x, y, z):
         k = 1 - 0.11 * math.exp(-(x / 2.4) ** 2) * (1 if y < 0 else 0.35)
-        if (x / (11.5 * k)) ** 2 + (y / (11 * k)) ** 2 + (z / (11 * k)) ** 2 <= 1:
-            S.add((x, y, z))
-    return [Part(S, (0.98, 0.66, 0.72), (1.0, 0.90, 0.92), nsw=6),
+        return (x / (11.5 * k)) ** 2 + (y / (11 * k)) ** 2 + (z / (11 * k)) ** 2 <= 1
+    S_ = {k for k, (x, y, z) in grid((-13, -13, -13), (13, 13, 13)) if inside(x, y, z)}
+    return [Part(S_, (0.98, 0.66, 0.72), (1.0, 0.90, 0.92), nsw=7),
             plain(path([(0, 0, 9), (0, 0, 12.5), (1.2, 0, 14.5)], 1.2, 0.9), GREEN), leaf((3.2, 0, 12), (3.6, 1.0, 1.3))]
 
 
 def f_pika():
     """Cloche jaune (design le plus répandu) : col étroit, jupe très évasée, lèvre épaisse ; tige bleu clair."""
-    vox = set()
-    for x, y, z in region((-16, -16, -12), (16, 16, 15)):
+    def inside(x, y, z):
         if z > 9:
             t = (z - 9) / 5.0
             rr = 6.0 * math.sqrt(max(0.0, 1 - t * t)) if t < 1 else -1
         else:
             rr = 6.0 + 9.2 * (clamp(-z, 0, 11) / 11.0) ** 1.7
-        if rr > 0 and x * x + y * y <= rr * rr:
-            vox.add((x, y, z))
-    vox = {p for p in vox if not (p[0] ** 2 + p[1] ** 2 + (p[2] + 15.5) ** 2 <= 12.5 ** 2)}
-    return [Part(vox, (0.98, 0.85, 0.22), (1.0, 0.97, 0.66), center=(0, 0, 0), nsw=6),
+        return rr > 0 and x * x + y * y <= rr * rr
+    vox = {k for k, (x, y, z) in grid((-16, -16, -12), (16, 16, 15)) if inside(x, y, z)}
+    vox = filt(vox, lambda x, y, z: not (x * x + y * y + (z + 15.5) ** 2 <= 12.5 ** 2))
+    return [Part(vox, (0.98, 0.85, 0.22), (1.0, 0.97, 0.66), nsw=7),
             plain(path([(0, 0, 13), (0, 0, 16.5), (1.4, 0, 18.5), (3.4, 0, 19), (4.8, 0, 17.7)], 1.2, 0.9), (0.55, 0.82, 0.98))]
 
 
 def f_hie():
     """Pas de design officiel : ma version, un fruit bleu glacé hérissé d'éclats de glace, tige turquoise."""
     shards = set()
-    for d in fib(16, -0.7, 0.8):
-        shards |= capsule((d[0] * 7, d[1] * 7, d[2] * 7), (d[0] * 15.5, d[1] * 15.5, d[2] * 15.5), 3.4, 0.4)
-    return [Part(ell((0, 0, 0), (9.2, 9.2, 9.2)), (0.56, 0.80, 0.97), (0.90, 0.97, 1.0), nsw=5),
+    for i, d in enumerate(fib(22, -0.7, 0.8)):
+        ln = 15.5 if i % 2 == 0 else 13
+        shards |= capsule((d[0] * 7, d[1] * 7, d[2] * 7), (d[0] * ln, d[1] * ln, d[2] * ln), 3.0, 0.4)
+    return [Part(ell((0, 0, 0), (9.2, 9.2, 9.2)), (0.56, 0.80, 0.97), (0.90, 0.97, 1.0), nsw=6),
             plain(shards, (0.83, 0.93, 1.0)),
             plain(path([(0, 0, 8), (0, 0, 12), (1.4, 0, 14), (3.2, 0, 14.5)], 1.2, 0.9), (0.30, 0.78, 0.78))]
 
@@ -699,47 +763,152 @@ def make_fruit(i):
     return paint(FRUITS[i][1](), seed=1000 + 17 * i)
 
 
-# ======================================================================= maillage
-FACES = {
-    (1, 0, 0): [(1, 0, 0), (1, 1, 0), (1, 1, 1), (1, 0, 1)],
-    (-1, 0, 0): [(0, 0, 0), (0, 0, 1), (0, 1, 1), (0, 1, 0)],
-    (0, 1, 0): [(0, 1, 0), (0, 1, 1), (1, 1, 1), (1, 1, 0)],
-    (0, -1, 0): [(0, 0, 0), (1, 0, 0), (1, 0, 1), (0, 0, 1)],
-    (0, 0, 1): [(0, 0, 1), (1, 0, 1), (1, 1, 1), (0, 1, 1)],
-    (0, 0, -1): [(0, 0, 0), (0, 1, 0), (1, 1, 0), (1, 0, 0)],
-}
+# ======================================================================= maillage glouton
+def greedy_mesh(vox):
+    """Fusionne les faces visibles voisines de même couleur en rectangles.
+    Renvoie (sommets entiers en demi-cubes, faces (indices), couleur de chaque face)."""
+    verts, vid = [], {}
+    faces, fcol = [], []
+
+    def vi(c):
+        i = vid.get(c)
+        if i is None:
+            i = vid[c] = len(verts)
+            verts.append(c)
+        return i
+    for axis in range(3):
+        u, v = (axis + 1) % 3, (axis + 2) % 3
+        for sign in (1, -1):
+            planes = {}
+            for key, col in vox.items():
+                nb = list(key)
+                nb[axis] += sign
+                if tuple(nb) in vox:
+                    continue
+                planes.setdefault(key[axis], {})[(key[u], key[v])] = col
+            for s, cells in planes.items():
+                done = set()
+                for cu, cv in sorted(cells):
+                    if (cu, cv) in done:
+                        continue
+                    col = cells[(cu, cv)]
+                    w = 1
+                    while cells.get((cu + w, cv)) == col and (cu + w, cv) not in done:
+                        w += 1
+                    h = 1
+                    while all(cells.get((cu + i, cv + h)) == col and (cu + i, cv + h) not in done for i in range(w)):
+                        h += 1
+                    for i in range(w):
+                        for j in range(h):
+                            done.add((cu + i, cv + j))
+                    a = 2 * s + sign                                       # plan de la face (en demi-cubes)
+                    u0, u1, v0, v1 = 2 * cu - 1, 2 * (cu + w - 1) + 1, 2 * cv - 1, 2 * (cv + h - 1) + 1
+                    quad = []
+                    for (pu, pv) in ((u0, v0), (u1, v0), (u1, v1), (u0, v1)):
+                        c = [0, 0, 0]
+                        c[axis], c[u], c[v] = a, pu, pv
+                        quad.append(vi(tuple(c)))
+                    if sign < 0:
+                        quad.reverse()
+                    faces.append(quad)
+                    fcol.append(col)
+    return verts, faces, fcol
 
 
 def voxel_mesh(name, vox):
-    """Maillage de cubes : uniquement les faces exposées ; couleur par face (attribut « Col »)."""
-    import bmesh
+    """Maillage léger : sommets partagés, une couleur par face (attribut « Col »)."""
     import bpy
-    bm = bmesh.new()
-    col = bm.loops.layers.color.new("Col")
-    for (x, y, z), c in vox.items():
-        for d, quad in FACES.items():
-            if (x + d[0], y + d[1], z + d[2]) in vox:
-                continue
-            vs = [bm.verts.new(((x + a - 0.5) * VOX, (y + b - 0.5) * VOX, (z + e - 0.5) * VOX)) for a, b, e in quad]
-            f = bm.faces.new(vs)
-            for loop in f.loops:
-                loop[col] = (*c, 1.0)
+    verts, faces, fcol = greedy_mesh(vox)
     me = bpy.data.meshes.new(name)
-    bm.to_mesh(me)
-    bm.free()
+    h = VOX / 2
+    me.from_pydata([(c[0] * h, c[1] * h, c[2] * h) for c in verts], [], faces)
+    attr = me.color_attributes.new("Col", "BYTE_COLOR", "FACE")
+    flat = []
+    for c in fcol:
+        flat.extend((c[0], c[1], c[2], 1.0))
+    attr.data.foreach_set("color", flat)
+    me.update()
     return me
 
 
-def vertex_color_material():
+def cube_node_group(mat):
+    """Groupe de nœuds : points -> cubes (instances) de la taille d'un voxel, partagé par tous les fruits.
+    L'entrée « Maillage réel » transforme les instances en un vrai maillage (utile pour appliquer / exporter)."""
+    import bpy
+    ng = bpy.data.node_groups.new("Cubes_voxel", "GeometryNodeTree")
+    ng.interface.new_socket("Geometry", in_out="INPUT", socket_type="NodeSocketGeometry")
+    sock = ng.interface.new_socket("Maillage réel", in_out="INPUT", socket_type="NodeSocketBool")
+    sock.default_value = False
+    ng.interface.new_socket("Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
+    gi, go = ng.nodes.new("NodeGroupInput"), ng.nodes.new("NodeGroupOutput")
+    cube = ng.nodes.new("GeometryNodeMeshCube")
+    cube.inputs["Size"].default_value = (VOX, VOX, VOX)
+    setmat = ng.nodes.new("GeometryNodeSetMaterial")               # sans matériau, les cubes seraient gris
+    setmat.inputs["Material"].default_value = mat
+    iop = ng.nodes.new("GeometryNodeInstanceOnPoints")
+    real = ng.nodes.new("GeometryNodeRealizeInstances")
+    gi.location, cube.location, setmat.location, iop.location, real.location, go.location = (
+        (-500, 0), (-500, -200), (-300, -200), (-100, 0), (150, 0), (400, 0))
+    L = ng.links.new
+    L(gi.outputs["Geometry"], iop.inputs["Points"])
+    L(cube.outputs["Mesh"], setmat.inputs["Geometry"])
+    L(setmat.outputs["Geometry"], iop.inputs["Instance"])
+    L(iop.outputs["Instances"], real.inputs["Geometry"])
+    L(gi.outputs["Maillage réel"], real.inputs["Selection"])        # vrai : on réalise ; faux : cubes en instances
+    L(real.outputs["Geometry"], go.inputs[0])
+    return ng
+
+
+def point_mesh(name, vox):
+    """Un point coloré par cube visible (aucune face stockée) ; triés pour mieux se compresser."""
+    keys = sorted(vox)
+    me = __import__("bpy").data.meshes.new(name)
+    me.from_pydata([(k[0] * VOX, k[1] * VOX, k[2] * VOX) for k in keys], [], [])
+    attr = me.color_attributes.new("Col", "BYTE_COLOR", "POINT")
+    flat = []
+    for k in keys:
+        c = vox[k]
+        flat.extend((c[0], c[1], c[2], 1.0))
+    attr.data.foreach_set("color", flat)
+    return me
+
+
+def mesh_stats():
+    """Nombre de cubes, de faces avant fusion et de rectangles après fusion, pour chaque fruit."""
+    rows = []
+    for i, (name, _) in enumerate(FRUITS):
+        vox = make_fruit(i)
+        naive = sum(1 for k in vox for d in NEIGH if (k[0] + d[0], k[1] + d[1], k[2] + d[2]) not in vox)
+        verts, faces, _ = greedy_mesh(vox)
+        rows.append((name, len(vox), naive, len(faces), len(verts)))
+    return rows
+
+
+# ======================================================================= scène
+def vertex_color_material(instanced=False):
+    """Matériau des fruits : lit la couleur « Col » (attribut de l'instance en mode gn, de la face sinon)."""
     import bpy
     m = bpy.data.materials.new("Fruit_voxel")
     m.use_nodes = True
     nt = m.node_tree
     b = nt.nodes["Principled BSDF"]
     b.inputs["Roughness"].default_value = 0.5
-    a = nt.nodes.new("ShaderNodeVertexColor")
-    a.layer_name = "Col"
-    nt.links.new(a.outputs["Color"], b.inputs["Base Color"])
+    vc = nt.nodes.new("ShaderNodeVertexColor")                       # couleur du maillage réel / de la face
+    vc.layer_name = "Col"
+    if instanced:
+        # couleur de l'instance (cubes) + couleur du maillage réel : l'une des deux est noire, on les additionne
+        at = nt.nodes.new("ShaderNodeAttribute")
+        at.attribute_type = "INSTANCER"
+        at.attribute_name = "Col"
+        mix = nt.nodes.new("ShaderNodeMix")
+        mix.data_type = "RGBA"
+        mix.blend_type = "ADD"
+        mix.inputs["Factor"].default_value = 1.0
+        nt.links.new(at.outputs["Color"], mix.inputs["A"])
+        nt.links.new(vc.outputs["Color"], mix.inputs["B"])
+        nt.links.new(mix.outputs["Result"], b.inputs["Base Color"])
+    else:
+        nt.links.new(vc.outputs["Color"], b.inputs["Base Color"])
     return m
 
 
@@ -790,7 +959,6 @@ def wood_floor():
     return m
 
 
-# ======================================================================= scène
 COLS, DX, DY = 9, 7.9, 10.2
 
 
@@ -801,14 +969,15 @@ def layout(i):
     return (col - (n - 1) / 2) * DX, row * DY, 1.5 + 2.8 * row
 
 
-def build(dst, glb=None):
+def build(dst, mode="gn", glb=None):
     import bpy
     bpy.ops.wm.read_factory_settings(use_empty=True)
     sc = bpy.context.scene
     sc.render.resolution_x, sc.render.resolution_y = 1920, 1080
     sc.view_settings.view_transform = "Standard"
 
-    fmat = vertex_color_material()
+    fmat = vertex_color_material(instanced=(mode == "gn"))
+    ng = cube_node_group(fmat) if mode == "gn" else None
     wood = simple_material("Presentoir", (0.30, 0.17, 0.09), 0.7)
     top = simple_material("Presentoir_dessus", (0.42, 0.25, 0.13), 0.6)
     gold = simple_material("Or", (1.0, 0.78, 0.30), 0.35, emission=0.6)
@@ -826,11 +995,14 @@ def build(dst, glb=None):
         add_box(f"Presentoir_{i + 1:02d}", (wx - 3.4, wy - 3.5, 0), (wx + 3.4, wy + 3.5, h), wood)
         add_box(f"Plateau_{i + 1:02d}", (wx - 3.55, wy - 3.65, h), (wx + 3.55, wy + 3.65, h + 0.18), top)
         vox = make_fruit(i)
-        me = voxel_mesh(f"Fruit_{name}", vox)
+        me = point_mesh(f"Fruit_{name}", vox) if mode == "gn" else voxel_mesh(f"Fruit_{name}", vox)
         me.materials.append(fmat)
         ob = bpy.data.objects.new(f"Fruit_{name}", me)
-        zmin = min(z for (_, _, z) in vox) - 0.5
-        ob.location = (wx, wy + 0.3, h + 0.18 - zmin * VOX)
+        if mode == "gn":
+            md = ob.modifiers.new("Cubes", "NODES")
+            md.node_group = ng
+        zlow = min(k[2] for k in vox) - 0.5
+        ob.location = (wx, wy + 0.3, h + 0.18 - zlow * VOX)
         ob.rotation_euler = (0, 0, math.radians(((i * 37) % 25) - 12))
         coll.objects.link(ob)
         fruit_objs.append(ob)
@@ -841,7 +1013,7 @@ def build(dst, glb=None):
         cu.align_x = "CENTER"
         cu.materials.append(gold)
         txt = bpy.data.objects.new(f"Nom_{i + 1:02d}", cu)
-        txt.location = (wx, wy - 3.1, h + 0.2)              # à plat sur le plateau, devant le fruit
+        txt.location = (wx, wy - 3.1, h + 0.2)
         sc.collection.objects.link(txt)
 
     sun_d = bpy.data.lights.new("Soleil", "SUN")
@@ -878,8 +1050,8 @@ def build(dst, glb=None):
     cam2.rotation_euler = (math.radians(88), 0, 0)
     sc.collection.objects.link(cam2)
 
-    bpy.ops.wm.save_as_mainfile(filepath=dst)
-    print(f"OK: {dst} ({len(FRUITS)} fruits)")
+    bpy.ops.wm.save_as_mainfile(filepath=dst, compress=True)
+    print(f"OK: {dst} ({len(FRUITS)} fruits, mode {mode}, finesse {SCALE})")
     if glb:
         try:
             for o in bpy.data.objects:
@@ -894,5 +1066,13 @@ def build(dst, glb=None):
 
 
 if __name__ == "__main__":
+    if "--stats" in sys.argv:
+        tot = [0, 0, 0, 0]
+        for name, nv, naive, nq, nvert in mesh_stats():
+            print(f"{name:26s} cubes {nv:6d}  faces brutes {naive:6d}  rectangles {nq:6d}  sommets {nvert:6d}")
+            tot = [tot[0] + nv, tot[1] + naive, tot[2] + nq, tot[3] + nvert]
+        print(f"{'TOTAL':26s} cubes {tot[0]:6d}  faces brutes {tot[1]:6d}  rectangles {tot[2]:6d}  sommets {tot[3]:6d}")
+        sys.exit(0)
     args = [a for a in sys.argv[1:] if not a.startswith("-")]
-    build(args[-2] if len(args) > 1 else args[-1], args[-1] if len(args) > 1 else None)
+    mode = "mesh" if "--mode=mesh" in sys.argv else "gn"
+    build(args[-1], mode)

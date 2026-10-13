@@ -62,7 +62,16 @@ Chaque bijū est un dictionnaire dans `tools/make_bijuu.py` (tailles, couleurs, 
 - Aperçus : `apercu/Shidou_Ciseau_Retourne.gif`, `apercu/Shidou_planche.png`, `apercu/Shidou_rendu_eevee.png`.
 
 ## Fruits du démon (One Piece) en cubes
-`models/Fruits_du_Demon.blend` : **26 fruits du démon en voxels** (cubes de 18 cm), chacun avec **sa propre forme** et la **peau à spirales en relief** (cubes recolorés et surélevés d'un cran). Présentoirs en gradins avec le nom de chaque fruit. Scène statique.
+`models/Fruits_du_Demon.blend` : **26 fruits du démon en voxels**, chacun avec **sa propre forme** et la **peau à spirales en relief** (cubes recolorés et surélevés). Présentoirs en gradins avec le nom de chaque fruit. Scène statique, faite avec Blender 5.2.
+
+**Détail et poids** (version précédente → actuelle) :
+| | avant | maintenant |
+|---|---|---|
+| taille d'un cube | 18 cm | **9 cm** (spirales et silhouettes 2× plus fines) |
+| cubes | 49 000 | **210 000** |
+| poids du fichier | 2,5 Mo | **0,7 Mo** |
+
+Le fichier ne contient qu'**un point coloré par cube visible** (le cœur des fruits est vide) ; un modificateur « Nœuds de géométrie » (`Cubes`, le même pour tous les fruits) fabrique les cubes à l'ouverture, en instances (légères en mémoire). Pour obtenir un vrai maillage (appliquer, exporter) : cocher **« Maillage réel »** dans le modificateur, puis *Objet > Appliquer > Modificateur*. Alternative : `python tools/make_fruits_demon.py SORTIE.blend --mode=mesh --scale=1.4` produit un maillage optimisé (faces voisines de même couleur fusionnées, sommets partagés ; ~5 Mo).
 
 | Fruit | Forme |
 |---|---|
@@ -94,6 +103,6 @@ Chaque bijū est un dictionnaire dans `tools/make_bijuu.py` (tailles, couleurs, 
 | Hie Hie | éclats de glace |
 
 - **Sources** : descriptions des wikis de l'œuvre trouvées par recherche web (je ne peux pas voir les images). **Incertitudes** : Hie Hie n'a pas de design officiel (c'est mon interprétation) ; Pika Pika est décrit tantôt en cloche, tantôt en étoile ; la couleur de Bara Bara varie (rouge-orangé ou violet) ; les couleurs diffèrent entre l'anime et le manga.
-- Chaque fruit est un objet séparé (`Fruit_<nom>`, collection « Fruits »). Couleurs en attribut de couleur « Col ». Caméras : `Camera_Ensemble` (par défaut) et `Camera_GrosPlan`.
-- Régénérer : `python tools/make_fruits_demon.py SORTIE.blend [SORTIE.glb]`.
+- Chaque fruit est un objet séparé (`Fruit_<nom>`, collection « Fruits »). Caméras : `Camera_Ensemble` (par défaut) et `Camera_GrosPlan`.
+- Régénérer : `python tools/make_fruits_demon.py SORTIE.blend` (option `--scale=1` pour des cubes de 18 cm).
 - Aperçus : `apercu/Fruits_du_Demon_vue_ensemble.png`, `apercu/Fruits_du_Demon_gros_plans.png` (guide : un fruit par case).
