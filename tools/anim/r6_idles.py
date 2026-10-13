@@ -139,12 +139,123 @@ def muzan(t):
     return d
 
 
+def gon(t):
+    """Joyeux, énergique, curieux : petits rebonds sur la pointe des pieds, bras qui se balancent, tête qui regarde partout,
+    poing levé de joie."""
+    T = 4.0
+    bounce = S(t, T, 4)
+    swing = S(t, T, 2)
+    cheer = bump(t, 2.3, 2.5, 2.7, 3.0)
+    d = {}
+    d["Torso"] = dict(rot=(-3 - 3 * cheer + 1.2 * bounce, 0, 3 * S(t, T, 1)), loc=(0.04 * S(t, T, 1), 0, 0.05 * abs(bounce) - 0.03 * cheer))
+    d["Head"] = dict(rot=(5 + 3 * bounce + 8 * cheer, 5 * S(t, T, 2, 0.25), 20 * S(t, T, 1) + 5 * S(t, T, 3)))
+    d["RightUpperArm"] = dict(rot=arm(1, fwd=(10 + 14 * swing) * (1 - cheer) + 115 * cheer, abd=8 + 2 * bounce + 4 * cheer))
+    d["LeftUpperArm"] = dict(rot=arm(-1, fwd=10 - 14 * swing, abd=8 + 2 * bounce))
+    d["LeftLeg-IKTarget"] = dict(loc=(-0.12, 0.04, 0.05 * max(0.0, bounce)))
+    d["RightLeg-IKTarget"] = dict(loc=(0.12, 0.04, 0.05 * max(0.0, -bounce)))
+    return d
+
+
+def killua(t):
+    """Cool et nonchalant, un peu blasé : mains dans les poches, affalé sur une jambe, pied qui tape, tête penchée,
+    regard félin soudain puis étirement de nuque."""
+    T = 6.0
+    br = S(t, T, 2)
+    glance = bump(t, 3.2, 3.35, 3.6, 3.85)
+    stretch = bump(t, 4.4, 5.0, 5.2, 5.8)
+    tap = bump(t, 0.6, 0.8, 2.0, 2.3) * max(0.0, S(t, T, 5))
+    d = {}
+    d["Torso"] = dict(rot=(-5 + 0.5 * br - 2 * stretch, 0, 4 * S(t, T, 1) + 5 * glance), loc=(0.12 + 0.03 * S(t, T, 1), 0, 0.012 * br))
+    d["Head"] = dict(rot=(-3 + 6 * glance + 12 * stretch, 10 - 3 * glance - 24 * stretch, 4 * S(t, T, 1) + 30 * glance))
+    d["RightUpperArm"] = dict(rot=arm(1, fwd=-10 + 0.8 * br, abd=-5))
+    d["LeftUpperArm"] = dict(rot=arm(-1, fwd=-10 + 0.8 * br, abd=-5))
+    d["LeftLeg-IKTarget"] = dict(loc=(0.05, 0.14, 0.12 * tap))
+    d["RightLeg-IKTarget"] = dict(loc=(0.1, -0.03, 0))
+    return d
+
+
+def kurapika(t):
+    """Sérieux, maître de lui, toujours en alerte : très droit, bras collés, poing droit légèrement avancé,
+    balayage lent du regard, puis un éclair de tension (colère contenue)."""
+    T = 6.0
+    br = S(t, T, 2)
+    tense = bump(t, 3.6, 3.9, 4.4, 5.0)
+    d = {}
+    d["Torso"] = dict(rot=(1 + 0.5 * br - 2 * tense, 0, 2 * S(t, T, 1)), loc=(0, 0, 0.012 * br))
+    d["Head"] = dict(rot=(2 + 0.4 * br - 13 * tense, 1.5, 21 * S(t, T, 1) * (1 - tense) - 5 * tense))
+    d["RightUpperArm"] = dict(rot=arm(1, fwd=9 + 0.8 * br + 8 * tense, abd=2 - 6 * tense))
+    d["LeftUpperArm"] = dict(rot=arm(-1, fwd=-2 + 0.8 * br + 5 * tense, abd=4 - 6 * tense))
+    d["LeftLeg-IKTarget"] = dict(loc=(0.12, 0, 0))
+    d["RightLeg-IKTarget"] = dict(loc=(-0.12, 0, 0))
+    return d
+
+
+def leorio(t):
+    """Adulte fier, un peu fanfaron et soupe au lait : poings sur les hanches, torse bombé, menton levé, gros éclat de rire
+    qui secoue les épaules, puis il rajuste ses lunettes d'un air important."""
+    T = 5.0
+    laugh = bump(t, 1.0, 1.2, 2.3, 2.6)
+    glasses = bump(t, 3.2, 3.6, 4.0, 4.4)
+    d = {}
+    shake = math.sin(2 * math.pi * 7 * t) * laugh
+    d["Torso"] = dict(rot=(3 - 4 * laugh + 1.0 * shake, 0, 4 * S(t, T, 1) + 2.5 * shake), loc=(0.10 * S(t, T, 1), 0, 0.03 * shake + 0.01 * S(t, T, 2)))
+    d["Head"] = dict(rot=(8 + 10 * laugh - 10 * glasses, 3 * S(t, T, 1), -4 * S(t, T, 1) + 6 * glasses))
+    d["RightUpperArm"] = dict(rot=arm(1, fwd=-12 * (1 - glasses) + 120 * glasses + 3 * shake, abd=38 * (1 - glasses) - 24 * glasses))
+    d["LeftUpperArm"] = dict(rot=arm(-1, fwd=-12 + 3 * shake, abd=38 + 1.5 * shake))
+    d["LeftLeg-IKTarget"] = dict(loc=(-0.15, 0, 0))
+    d["RightLeg-IKTarget"] = dict(loc=(0.15, 0, 0))
+    return d
+
+
+def meruem(t):
+    """Roi souverain, puissance écrasante et curiosité d'intellectuel : debout, torse bombé, respiration lente et profonde,
+    léger tremblement de puissance, regard qui domine la pièce, pose pensive (main au menton), puis tête qui s'incline."""
+    T = 10.0
+    br = S(t, T, 2)
+    think = bump(t, 2.8, 4.0, 6.0, 7.0)
+    menace = bump(t, 7.6, 8.4, 9.0, 9.7)
+    aura = S(t, T, 60)                          # tremblement de puissance, très discret (6 Hz)
+    d = {}
+    d["Torso"] = dict(rot=(3 + 1.1 * br - 2 * think + 0.2 * aura, 0, 3 * S(t, T, 1) + 6 * menace),
+                      loc=(0.04 * S(t, T, 1), 0, 0.03 * br + 0.006 * aura))
+    d["Head"] = dict(rot=(9 + 0.6 * br - 8 * think - 4 * menace, 12 * think - 11 * menace, 18 * S(t, T, 1) * (1 - think) + 10 * think - 10 * menace))
+    d["RightUpperArm"] = dict(rot=arm(1, fwd=-2 + 128 * think + 0.4 * aura, abd=14 * (1 - think) - 30 * think))
+    d["LeftUpperArm"] = dict(rot=arm(-1, fwd=-2 + 0.5 * br + 0.4 * aura, abd=15 + 1.0 * br))
+    d["LeftLeg-IKTarget"] = dict(loc=(-0.12, 0, 0))
+    d["RightLeg-IKTarget"] = dict(loc=(0.12, 0, 0))
+    return d
+
+
+def hisoka(t):
+    """Joueur, dérangeant, séducteur et menaçant : balancement de hanches nonchalant, main à la hanche, carte en main
+    près du menton qu'il claque d'un geste vif, tête penchée, petit rire qui secoue le torse."""
+    T = 6.0
+    sway = S(t, T, 1)
+    flick = bump(t, 1.8, 1.9, 2.0, 2.3)
+    giggle = bump(t, 2.8, 2.95, 3.6, 3.95)
+    shake = math.sin(2 * math.pi * 9 * t) * giggle
+    d = {}
+    d["Torso"] = dict(rot=(-4 + 4 * S(t, T, 2) - 2 * giggle + 1.0 * shake, 6 * sway, 9 * S(t, T, 1, 0.25) + 2.5 * shake), loc=(0.18 * sway, 0, 0.02 * shake))
+    d["Head"] = dict(rot=(-2 + 6 * giggle, 14 + 6 * sway + 4 * giggle, 12 * S(t, T, 1, 0.5) - 6 * flick))
+    d["RightUpperArm"] = dict(rot=arm(1, fwd=(62 + 2 * S(t, T, 6)) * (1 - flick) + 108 * flick, abd=-28 * (1 - flick) - 6 * flick))
+    d["LeftUpperArm"] = dict(rot=arm(-1, fwd=-10 + 1.5 * shake, abd=30 + 2 * sway))
+    d["LeftLeg-IKTarget"] = dict(loc=(0.16, 0.2, 0))
+    d["RightLeg-IKTarget"] = dict(loc=(0.0, 0, 0))
+    return d
+
+
 # Registre : nom -> (fonction de pose, durée de boucle en s, pas entre clés en images, description)
 CHARACTERS = {
     "Tanjiro": (tanjiro, 6.0, 6, "modeste, doux et poli"),
     "Nezuko": (nezuko, 4.0, 4, "timide"),
     "Inosuke": (inosuke, 2.0, 3, "excité et sauvage"),
     "Muzan": (muzan, 8.0, 8, "froid, arrogant, sûr de lui"),
+    "Gon": (gon, 4.0, 3, "joyeux, énergique, curieux"),
+    "Killua": (killua, 6.0, 5, "cool, nonchalant, félin"),
+    "Kurapika": (kurapika, 6.0, 6, "sérieux, maître de lui, en alerte"),
+    "Leorio": (leorio, 5.0, 2, "fier, fanfaron, soupe au lait"),
+    "Meruem": (meruem, 10.0, 3, "roi souverain, puissant et curieux"),
+    "Hisoka": (hisoka, 6.0, 2, "joueur, dérangeant, séducteur"),
 }
 
 

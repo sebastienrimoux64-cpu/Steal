@@ -10,6 +10,12 @@ comme d'habitude. Rien n'est coupé : seuls les os de contrôle bougent.
 | `Idle_Nezuko.blend`  | Nezuko  | 4 s | **Timide** : épaules rentrées, bras serrés contre la poitrine, tête baissée et penchée, genoux qui se touchent, coups d'œil furtifs puis regard détourné, un pied qui se frotte |
 | `Idle_Inosuke.blend` | Inosuke | 2 s | **Excité, sauvage** : rebond permanent, torse penché en avant façon bête, tête qui claque d'un côté à l'autre, bras écartés en griffes, coups de poing dans le vide, piétinements |
 | `Idle_Muzan.blend`   | Muzan   | 8 s | **Froid, arrogant** : presque immobile, menton levé, épaules en arrière, une main devant à la taille, respiration très lente, regard qui balaie, puis inclinaison de tête menaçante |
+| `Idle_Gon.blend`      | Gon      | 4 s  | **Joyeux, énergique, curieux** : petits rebonds sur la pointe des pieds, bras qui se balancent, tête qui regarde partout, poing levé de joie |
+| `Idle_Killua.blend`   | Killua   | 6 s  | **Cool, nonchalant, félin** : mains dans les poches, affalé sur une jambe, pied qui tape, tête penchée, regard félin soudain, étirement de nuque |
+| `Idle_Kurapika.blend` | Kurapika | 6 s  | **Sérieux, maître de lui, en alerte** : très droit, bras collés, poing droit avancé, balayage lent du regard, éclair de tension contenue |
+| `Idle_Leorio.blend`   | Leorio   | 5 s  | **Fier, fanfaron, soupe au lait** : poings sur les hanches, torse bombé, menton levé, gros éclat de rire, rajuste ses lunettes |
+| `Idle_Meruem.blend`   | Meruem   | 10 s | **Roi souverain, puissant et curieux** : torse bombé, respiration lente et profonde, léger tremblement de puissance, pose pensive, tête qui s'incline |
+| `Idle_Hisoka.blend`   | Hisoka   | 6 s  | **Joueur, dérangeant, séducteur** : balancement de hanches, main à la hanche, carte près du menton claquée d'un geste vif, tête penchée, petit rire |
 
 Aperçus (vue 3/4 + vue de côté, couleurs de test seulement) : `previews/Idle_<Nom>.gif`.
 
