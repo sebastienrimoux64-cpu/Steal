@@ -207,12 +207,21 @@ def main():
     # 2) les 8 ensemble
     reset()
     coll = bpy.data.collections.new("Pickaxes"); bpy.context.scene.collection.children.link(coll)
+    lab_mat = bpy.data.materials.new("label"); lab_mat.use_nodes = True
+    lab_mat.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = (0.9, 0.9, 0.92, 1)
     for i, name in enumerate(ORDER):
         o = build_object(name, vox, coll, origin_xyz=((i - 3.5) * 0.95, 0, 0))
         try:
             o.asset_mark()
         except Exception:
             pass
+        # étiquette sous la pioche (nom de la matière)
+        cu = bpy.data.curves.new("txt", "FONT"); cu.body = MATERIALS[name]["label"].capitalize(); cu.size = 0.11; cu.align_x = "CENTER"; cu.extrude = 0.004
+        cu.resolution_u = 2; cu.materials.append(lab_mat)
+        t = bpy.data.objects.new(f"Label_{name}", cu); coll.objects.link(t)
+        t.location = ((i - 3.5) * 0.95 + 0.33, 0, -0.24); t.rotation_euler = (math.radians(90), 0, 0)
+        bpy.context.view_layer.objects.active = t; bpy.ops.object.select_all(action="DESELECT"); t.select_set(True)
+        bpy.ops.object.convert(target="MESH")
     setup_preview()
     cam = bpy.data.objects.new("Cam", bpy.data.cameras.new("Cam")); cam.data.lens = 50
     cam.location = (0, -11.5, 0.5); cam.rotation_euler = (math.radians(90), 0, 0)
