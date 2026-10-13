@@ -53,6 +53,16 @@ def sq(t, T, k, sharp=3.0, phase=0.0):
     return math.tanh(sharp * S(t, T, k, phase))
 
 
+def track(t, pts):
+    """Valeur au temps t d'une suite de clés [(temps, valeur), ...] : interpolation douce entre clés, constante avant/après."""
+    if t <= pts[0][0]:
+        return pts[0][1]
+    for (t0, v0), (t1, v1) in zip(pts, pts[1:]):
+        if t <= t1:
+            return v0 + (v1 - v0) * ease((t - t0) / (t1 - t0))
+    return pts[-1][1]
+
+
 def arm(side, fwd=0.0, abd=0.0, twist=0.0):
     """Rotation d'un bras. side=+1 droit / -1 gauche. fwd : lever vers l'avant (°). abd : écarté du corps (°, <0 = vers le corps)."""
     return (fwd, -side * abd, twist)
@@ -70,7 +80,7 @@ def tanjiro(t):
     bow = bump(t, 1.5, 2.4, 2.8, 3.8)     # petite révérence polie
     glance = bump(t, 4.3, 4.8, 5.1, 5.7)  # regard attentif vers la gauche
     d = {}
-    d["Torso"] = dict(rot=(-(1.5 + 10 * bow) + 0.5 * br, 0, 2.0 * sway - 3 * glance), loc=(0.07 * sway, 0, 0.02 * br - 0.03 * bow))
+    d["Torso"] = dict(rot=(-(1.5 + 10 * bow) + 0.9 * br, 0, 2.0 * sway - 3 * glance), loc=(0.07 * sway, 0, 0))
     d["Head"] = dict(rot=(-(6 + 13 * bow) + 0.8 * br, 3 + 2 * S(t, T, 1, 0.25) - 2 * glance, 16 * glance - 2.5 * sway))
     for s, name in ((1, "RightUpperArm"), (-1, "LeftUpperArm")):
         d[name] = dict(rot=arm(s, fwd=20 + 2.5 * br + 7 * bow + 1.5 * s * sway, abd=-15 - 1.0 * br))
@@ -89,7 +99,7 @@ def nezuko(t):
     avert = bump(t, 2.0, 2.35, 3.0, 3.5)    # détourne vite le regard, se recroqueville
     d = {}
     d["Torso"] = dict(rot=(-(7 - 2 * peek + 3 * avert) + 0.6 * br, 0, 2 * sw - 7 * avert + 3 * peek),
-                      loc=(0.05 * sw, 0, -0.05 + 0.015 * br))
+                      loc=(0.05 * sw, 0, 0))
     d["Head"] = dict(rot=(-(21 - 14 * peek + 7 * avert) + 0.8 * br, 10 - 5 * peek + 3 * avert + 2 * sw,
                           17 * peek - 22 * avert))
     for s, name in ((1, "RightUpperArm"), (-1, "LeftUpperArm")):
@@ -107,16 +117,16 @@ def inosuke(t):
     T = 2.0
     bounce = S(t, T, 4)
     d = {}
-    d["Torso"] = dict(rot=(-15 + 3 * bounce, 0, 7 * S(t, T, 2)), loc=(0.05 * S(t, T, 1), 0, -0.1 + 0.09 * bounce))
-    d["Head"] = dict(rot=(3 + 3 * bounce, 7 * S(t, T, 2, 0.25), 36 * sq(t, T, 1, 3.0)))
+    d["Torso"] = dict(rot=(-15 + 3 * bounce, 0, 7 * S(t, T, 2)), loc=(0.05 * S(t, T, 1), 0, -0.12 + 0.05 * bounce))
+    d["Head"] = dict(rot=(3 + 3 * bounce, 7 * S(t, T, 2, 0.25), 36 * sq(t, T, 1, 2.2)))
     pr = bump(t, 0.18, 0.30, 0.38, 0.55)        # coup de poing droit
     pl = bump(t, 1.18, 1.30, 1.38, 1.55)        # coup de poing gauche
     for s, name, p in ((1, "RightUpperArm", pr), (-1, "LeftUpperArm", pl)):
         base_f = 22 + 9 * bounce * s
         base_a = 38 + 6 * bounce
         d[name] = dict(rot=arm(s, fwd=base_f * (1 - p) + 85 * p, abd=base_a * (1 - p) + 4 * p, twist=0))
-    st_l = bump(t, 0.50, 0.58, 0.64, 0.78)
-    st_r = bump(t, 1.50, 1.58, 1.64, 1.78)
+    st_l = bump(t, 0.45, 0.58, 0.64, 0.80)
+    st_r = bump(t, 1.45, 1.58, 1.64, 1.80)
     d["LeftLeg-IKTarget"] = dict(loc=(-0.22, 0.05, 0.22 * st_l))
     d["RightLeg-IKTarget"] = dict(loc=(0.22, 0.05, 0.22 * st_r))
     return d
@@ -130,7 +140,7 @@ def muzan(t):
     menace = bump(t, 4.6, 5.6, 6.4, 7.5)
     flick = bump(t, 2.5, 2.8, 3.0, 3.5)
     d = {}
-    d["Torso"] = dict(rot=(2 + 0.4 * br, 0, -6 * menace + 1.5 * S(t, T, 1)), loc=(0.06 + 0.03 * S(t, T, 1), 0, 0.012 * br))
+    d["Torso"] = dict(rot=(2 + 0.8 * br, 0, -6 * menace + 1.5 * S(t, T, 1)), loc=(0.06 + 0.03 * S(t, T, 1), 0, 0))
     d["Head"] = dict(rot=(11 + 0.5 * br - 5 * menace, 3 + 17 * menace, 11 * S(t, T, 1) - 20 * menace))
     d["RightUpperArm"] = dict(rot=arm(1, fwd=34 + 1.3 * S(t, T, 3) + 8 * flick, abd=-17))
     d["LeftUpperArm"] = dict(rot=arm(-1, fwd=-5 + 0.8 * br, abd=7 + 0.8 * br))
@@ -147,12 +157,12 @@ def gon(t):
     swing = S(t, T, 2)
     cheer = bump(t, 2.3, 2.5, 2.7, 3.0)
     d = {}
-    d["Torso"] = dict(rot=(-3 - 3 * cheer + 1.2 * bounce, 0, 3 * S(t, T, 1)), loc=(0.04 * S(t, T, 1), 0, 0.05 * abs(bounce) - 0.03 * cheer))
+    d["Torso"] = dict(rot=(-3 - 3 * cheer + 1.2 * bounce, 0, 3 * S(t, T, 1)), loc=(0.04 * S(t, T, 1), 0, -0.09 + 0.04 * bounce - 0.03 * cheer))
     d["Head"] = dict(rot=(5 + 3 * bounce + 8 * cheer, 5 * S(t, T, 2, 0.25), 20 * S(t, T, 1) + 5 * S(t, T, 3)))
     d["RightUpperArm"] = dict(rot=arm(1, fwd=(10 + 14 * swing) * (1 - cheer) + 115 * cheer, abd=8 + 2 * bounce + 4 * cheer))
     d["LeftUpperArm"] = dict(rot=arm(-1, fwd=10 - 14 * swing, abd=8 + 2 * bounce))
-    d["LeftLeg-IKTarget"] = dict(loc=(-0.12, 0.04, 0.05 * max(0.0, bounce)))
-    d["RightLeg-IKTarget"] = dict(loc=(0.12, 0.04, 0.05 * max(0.0, -bounce)))
+    d["LeftLeg-IKTarget"] = dict(loc=(-0.12, 0.04, 0.05 * max(0.0, bounce) ** 2))
+    d["RightLeg-IKTarget"] = dict(loc=(0.12, 0.04, 0.05 * max(0.0, -bounce) ** 2))
     return d
 
 
@@ -163,9 +173,9 @@ def killua(t):
     br = S(t, T, 2)
     glance = bump(t, 3.2, 3.35, 3.6, 3.85)
     stretch = bump(t, 4.4, 5.0, 5.2, 5.8)
-    tap = bump(t, 0.6, 0.8, 2.0, 2.3) * max(0.0, S(t, T, 5))
+    tap = bump(t, 0.6, 0.8, 2.0, 2.3) * max(0.0, S(t, T, 5)) ** 2
     d = {}
-    d["Torso"] = dict(rot=(-5 + 0.5 * br - 2 * stretch, 0, 4 * S(t, T, 1) + 5 * glance), loc=(0.12 + 0.03 * S(t, T, 1), 0, 0.012 * br))
+    d["Torso"] = dict(rot=(-5 + 0.9 * br - 2 * stretch, 0, 4 * S(t, T, 1) + 5 * glance), loc=(0.12 + 0.03 * S(t, T, 1), 0, 0))
     d["Head"] = dict(rot=(-3 + 6 * glance + 12 * stretch, 10 - 3 * glance - 24 * stretch, 4 * S(t, T, 1) + 30 * glance))
     d["RightUpperArm"] = dict(rot=arm(1, fwd=-10 + 0.8 * br, abd=-5))
     d["LeftUpperArm"] = dict(rot=arm(-1, fwd=-10 + 0.8 * br, abd=-5))
@@ -181,7 +191,7 @@ def kurapika(t):
     br = S(t, T, 2)
     tense = bump(t, 3.6, 3.9, 4.4, 5.0)
     d = {}
-    d["Torso"] = dict(rot=(1 + 0.5 * br - 2 * tense, 0, 2 * S(t, T, 1)), loc=(0, 0, 0.012 * br))
+    d["Torso"] = dict(rot=(1 + 0.9 * br - 2 * tense, 0, 2 * S(t, T, 1)), loc=(0, 0, 0))
     d["Head"] = dict(rot=(2 + 0.4 * br - 13 * tense, 1.5, 21 * S(t, T, 1) * (1 - tense) - 5 * tense))
     d["RightUpperArm"] = dict(rot=arm(1, fwd=9 + 0.8 * br + 8 * tense, abd=2 - 6 * tense))
     d["LeftUpperArm"] = dict(rot=arm(-1, fwd=-2 + 0.8 * br + 5 * tense, abd=4 - 6 * tense))
@@ -197,11 +207,11 @@ def leorio(t):
     laugh = bump(t, 1.0, 1.2, 2.3, 2.6)
     glasses = bump(t, 3.2, 3.6, 4.0, 4.4)
     d = {}
-    shake = math.sin(2 * math.pi * 7 * t) * laugh
-    d["Torso"] = dict(rot=(3 - 4 * laugh + 1.0 * shake, 0, 4 * S(t, T, 1) + 2.5 * shake), loc=(0.10 * S(t, T, 1), 0, 0.03 * shake + 0.01 * S(t, T, 2)))
+    shake = S(t, T, 10) * laugh                      # rire : rebond lisse à 2 Hz (pas de tremblement)
+    d["Torso"] = dict(rot=(3 - 4 * laugh + 2.2 * shake, 0, 4 * S(t, T, 1) + 1.5 * shake), loc=(0.10 * S(t, T, 1), 0, 0))
     d["Head"] = dict(rot=(8 + 10 * laugh - 10 * glasses, 3 * S(t, T, 1), -4 * S(t, T, 1) + 6 * glasses))
-    d["RightUpperArm"] = dict(rot=arm(1, fwd=-12 * (1 - glasses) + 120 * glasses + 3 * shake, abd=38 * (1 - glasses) - 24 * glasses))
-    d["LeftUpperArm"] = dict(rot=arm(-1, fwd=-12 + 3 * shake, abd=38 + 1.5 * shake))
+    d["RightUpperArm"] = dict(rot=arm(1, fwd=-12 * (1 - glasses) + 120 * glasses + 4 * shake, abd=38 * (1 - glasses) - 24 * glasses))
+    d["LeftUpperArm"] = dict(rot=arm(-1, fwd=-12 + 4 * shake, abd=38 + 2 * shake))
     d["LeftLeg-IKTarget"] = dict(loc=(-0.15, 0, 0))
     d["RightLeg-IKTarget"] = dict(loc=(0.15, 0, 0))
     return d
@@ -209,18 +219,17 @@ def leorio(t):
 
 def meruem(t):
     """Roi souverain, puissance écrasante et curiosité d'intellectuel : debout, torse bombé, respiration lente et profonde,
-    léger tremblement de puissance, regard qui domine la pièce, pose pensive (main au menton), puis tête qui s'incline."""
+    regard qui domine la pièce, pose pensive (main au menton), puis tête qui s'incline."""
     T = 10.0
     br = S(t, T, 2)
     think = bump(t, 2.8, 4.0, 6.0, 7.0)
     menace = bump(t, 7.6, 8.4, 9.0, 9.7)
-    aura = S(t, T, 60)                          # tremblement de puissance, très discret (6 Hz)
     d = {}
-    d["Torso"] = dict(rot=(3 + 1.1 * br - 2 * think + 0.2 * aura, 0, 3 * S(t, T, 1) + 6 * menace),
-                      loc=(0.04 * S(t, T, 1), 0, 0.03 * br + 0.006 * aura))
+    d["Torso"] = dict(rot=(3 + 1.6 * br - 2 * think, 0, 3 * S(t, T, 1) + 6 * menace),
+                      loc=(0.04 * S(t, T, 1), 0, 0))
     d["Head"] = dict(rot=(9 + 0.6 * br - 8 * think - 4 * menace, 12 * think - 11 * menace, 18 * S(t, T, 1) * (1 - think) + 10 * think - 10 * menace))
-    d["RightUpperArm"] = dict(rot=arm(1, fwd=-2 + 128 * think + 0.4 * aura, abd=14 * (1 - think) - 30 * think))
-    d["LeftUpperArm"] = dict(rot=arm(-1, fwd=-2 + 0.5 * br + 0.4 * aura, abd=15 + 1.0 * br))
+    d["RightUpperArm"] = dict(rot=arm(1, fwd=-2 + 128 * think , abd=14 * (1 - think) - 30 * think))
+    d["LeftUpperArm"] = dict(rot=arm(-1, fwd=-2 + 0.5 * br, abd=15 + 1.0 * br))
     d["LeftLeg-IKTarget"] = dict(loc=(-0.12, 0, 0))
     d["RightLeg-IKTarget"] = dict(loc=(0.12, 0, 0))
     return d
@@ -233,9 +242,9 @@ def hisoka(t):
     sway = S(t, T, 1)
     flick = bump(t, 1.8, 1.9, 2.0, 2.3)
     giggle = bump(t, 2.8, 2.95, 3.6, 3.95)
-    shake = math.sin(2 * math.pi * 9 * t) * giggle
+    shake = S(t, T, 12) * giggle                      # petit rire : rebond lisse à 2 Hz
     d = {}
-    d["Torso"] = dict(rot=(-4 + 4 * S(t, T, 2) - 2 * giggle + 1.0 * shake, 6 * sway, 9 * S(t, T, 1, 0.25) + 2.5 * shake), loc=(0.18 * sway, 0, 0.02 * shake))
+    d["Torso"] = dict(rot=(-4 + 4 * S(t, T, 2) - 2 * giggle + 1.0 * shake, 6 * sway, 9 * S(t, T, 1, 0.25) + 2.5 * shake), loc=(0.18 * sway, 0, 0))
     d["Head"] = dict(rot=(-2 + 6 * giggle, 14 + 6 * sway + 4 * giggle, 12 * S(t, T, 1, 0.5) - 6 * flick))
     d["RightUpperArm"] = dict(rot=arm(1, fwd=(62 + 2 * S(t, T, 6)) * (1 - flick) + 108 * flick, abd=-28 * (1 - flick) - 6 * flick))
     d["LeftUpperArm"] = dict(rot=arm(-1, fwd=-10 + 1.5 * shake, abd=30 + 2 * sway))
@@ -296,14 +305,14 @@ def channelbag_of(act):
     return act.layers[0].strips[0].channelbags[0]
 
 
-def build(rig_path, out_dir, name):
-    fn, T, step, desc = CHARACTERS[name]
+def build(rig_path, out_dir, name, registry=None, prefix="Idle"):
+    fn, T, step, desc = (registry or CHARACTERS)[name]
     bpy.ops.wm.open_mainfile(filepath=rig_path)
     arm = bpy.data.objects["Armature"]
     n_frames = int(round(T * FPS))
     base = bpy.data.actions.get("ArmatureAction")
     act = base.copy()
-    act.name = f"Idle_{name}"
+    act.name = f"{prefix}_{name}"
     arm.animation_data_create()
     arm.animation_data.action = act
     if hasattr(arm.animation_data, "action_slot") and act.slots:
@@ -356,9 +365,10 @@ def build(rig_path, out_dir, name):
     scn.frame_set(0)
     arm.animation_data.action = act
     os.makedirs(out_dir, exist_ok=True)
-    path = os.path.join(out_dir, f"Idle_{name}.blend")
+    bpy.context.preferences.filepaths.save_version = 0      # pas de fichier .blend1
+    path = os.path.join(out_dir, f"{prefix}_{name}.blend")
     bpy.ops.wm.save_as_mainfile(filepath=path)
-    print(f"Idle_{name}: {n_frames} images @ {FPS} fps ({T:.0f} s), {len(frames)} clés par os animé - {desc}")
+    print(f"{prefix}_{name}: {n_frames} images @ {FPS} fps ({T:.0f} s), {len(frames)} clés par os animé - {desc}")
     return path
 
 
