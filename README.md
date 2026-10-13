@@ -62,9 +62,38 @@ Chaque bijū est un dictionnaire dans `tools/make_bijuu.py` (tailles, couleurs, 
 - Aperçus : `apercu/Shidou_Ciseau_Retourne.gif`, `apercu/Shidou_planche.png`, `apercu/Shidou_rendu_eevee.png`.
 
 ## Fruits du démon (One Piece) en cubes
-`models/Fruits_du_Demon.blend` : **24 fruits du démon en voxels** (cubes de 18 cm), avec la **peau à spirales en relief** : chaque fruit porte plusieurs tourbillons (un grand face à la caméra), dessinés en cubes recolorés et surélevés d'un cran, plus une tige recourbée et une petite feuille. 6 formes (ronde, ovale, poire, gourde, aplatie, pomme, lobée) et une couleur par fruit. Les fruits sont posés sur des présentoirs en gradins avec leur nom en relief.
-- Gomu Gomu, Mera Mera, Hie Hie, Pika Pika, Yami Yami, Magu Magu, Gura Gura, Ope Ope, Goro Goro, Suna Suna, Hana Hana, Bara Bara, Doku Doku, Mochi Mochi, Yomi Yomi, Kage Kage, Hobby Hobby, Neko Neko, Tori Tori, Zou Zou, Bomu Bomu, Horu Horu, Nikyu Nikyu, Hito Hito no Mi (Nika).
-- Chaque fruit est un objet séparé (`Fruit_<nom>`, collection « Fruits ») : déplacez-le, copiez-le ou exportez-le. Couleurs en attribut de couleur « Col » (mode Vertex Paint, ou export glTF).
-- Caméras : `Camera_Ensemble` (par défaut) et `Camera_GrosPlan`. Scène statique (pas d'animation).
-- Régénérer : `python tools/make_fruits_demon.py SORTIE.blend [SORTIE.glb]`. Les couleurs sont inspirées de l'œuvre (elles varient selon l'anime et le manga).
-- Aperçus : `apercu/Fruits_du_Demon_vue_ensemble.png`, `apercu/Fruits_du_Demon_gros_plans.png`.
+`models/Fruits_du_Demon.blend` : **26 fruits du démon en voxels** (cubes de 18 cm), chacun avec **sa propre forme** et la **peau à spirales en relief** (cubes recolorés et surélevés d'un cran). Présentoirs en gradins avec le nom de chaque fruit. Scène statique.
+
+| Fruit | Forme |
+|---|---|
+| Gomu Gomu | melon violet, tige en pousse |
+| Mera Mera | flamme |
+| Ope Ope | cœur, tige en T |
+| Mero Mero | deux petits cœurs (rouge et violet) aux tiges jointes |
+| Ito Ito | poire lilas, tige fuchsia en vrille |
+| Doru Doru | poire blanche fondue en haut comme une bougie |
+| Ushi Ushi (Bison) | fraise noire à deux cornes |
+| Neko Neko (Léopard) | tête de léopard (oreilles à spirales, taches) |
+| Nikyu Nikyu | rond rose à trois bosses (patte) |
+| Hana Hana | fleur rose (dahlia) |
+| Suna Suna | cactus tonneau à côtes, deux petits bras |
+| Bara Bara | framboise / mini ananas |
+| Mochi Mochi | crème, étranglé en bas, pied plat |
+| Bomu Bomu | pomme violette façon bombe, tige en corde à mèche allumée |
+| Gura Gura | poire bleue fissurée |
+| Goro Goro | néflier doré à pointes d'éclair, tige en zigzag |
+| Magu Magu | boule de grosses bosses de magma |
+| Yami Yami | grosse grappe de gouttes violet pâle |
+| Tori Tori (Phénix) | ananas à lames bleues et jaunes |
+| Yomi Yomi | rond doré à quatre pieds (silhouette de crâne) |
+| Kage Kage | rond noir à feuilles d'oignon sur le côté |
+| Hobi Hobi | yo-yo, tige en huit couché |
+| Supa Supa | régime de bananes-sabres |
+| Sube Sube | pêche rose |
+| Pika Pika | cloche jaune |
+| Hie Hie | éclats de glace |
+
+- **Sources** : descriptions des wikis de l'œuvre trouvées par recherche web (je ne peux pas voir les images). **Incertitudes** : Hie Hie n'a pas de design officiel (c'est mon interprétation) ; Pika Pika est décrit tantôt en cloche, tantôt en étoile ; la couleur de Bara Bara varie (rouge-orangé ou violet) ; les couleurs diffèrent entre l'anime et le manga.
+- Chaque fruit est un objet séparé (`Fruit_<nom>`, collection « Fruits »). Couleurs en attribut de couleur « Col ». Caméras : `Camera_Ensemble` (par défaut) et `Camera_GrosPlan`.
+- Régénérer : `python tools/make_fruits_demon.py SORTIE.blend [SORTIE.glb]`.
+- Aperçus : `apercu/Fruits_du_Demon_vue_ensemble.png`, `apercu/Fruits_du_Demon_gros_plans.png` (guide : un fruit par case).
