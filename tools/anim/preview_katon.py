@@ -80,7 +80,7 @@ def fire(t):
         if 3.45 <= t <= 4.35: light.location = m + Vector((0, 1.5, 0))
 
 cam = bpy.data.objects.new("c", bpy.data.cameras.new("c")); cam.data.lens = 36; scn.collection.objects.link(cam); scn.camera = cam
-views = [((-5.5, 10.5, 4.8), (0, 2.6, 3.0)), ((16.0, 3.5, 4.0), (0, 3.5, 3.2))]
+views = [((-2.2, 10.0, 4.6), (0, 2.4, 3.0)), ((16.0, 3.5, 4.0), (0, 3.5, 3.2))]
 f0, f1 = scn.frame_start, scn.frame_end
 n = int(round((f1 - f0) / scn.render.fps * fps))
 tmp = tempfile.mkdtemp(); frames = []

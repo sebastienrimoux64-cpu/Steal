@@ -23,7 +23,7 @@ Aperçus (vue 3/4 + vue de côté, couleurs de test seulement) : `previews/Idle_
 
 | Fichier | Technique | Durée | Contenu |
 |---|---|---|---|
-| `Jutsu_Katon_GoukakyuuNoJutsu.blend` | **Katon : Grande boule de feu** (Uchiha) | 5,6 s | Refait d'après la séquence de référence (Obito / Kakashi) : **position prête** très basse, jambes largement écartées, épaule tournée, bras en « griffes » → **six mains rapides** devant la poitrine (Serpent, Bélier, Singe, Sanglier, Cheval, Tigre) → **grande inspiration** : le buste se tord et se gonfle, les bras se rentrent contre le corps, la tête regarde la cible → le corps se ramasse → **souffle explosif** : buste projeté en avant (avec dépassement), tête relevée, **bras tirés en arrière**, recul du pied droit → **jet maintenu** (balayage lent) → relâchement → retour à la position prête. Début = fin : s'enchaîne ou boucle. |
+| `Jutsu_Katon_GoukakyuuNoJutsu.blend` | **Katon : Grande boule de feu** (Uchiha) | 5,6 s | Refait d'après la séquence de référence (Obito / Kakashi) : **position prête** très basse, jambes largement écartées, épaule tournée, bras en « griffes » → **six mains rapides** (Serpent, Bélier, Singe, Sanglier, Cheval, Tigre) avec **les deux mains qui se touchent au centre de la poitrine** (au visage pour le Tigre), contact vérifié à chaque instant → **grande inspiration** : le buste se tord et se gonfle, **mains toujours jointes**, puis les bras se rentrent contre le corps, la tête regarde la cible → le corps se ramasse → **souffle explosif** : buste projeté en avant (avec dépassement), tête relevée, **bras tirés en arrière**, recul du pied droit → **jet maintenu** (balayage lent) → relâchement → retour à la position prête. Début = fin : s'enchaîne ou boucle. |
 
 L'aperçu `previews/Jutsu_Katon_GoukakyuuNoJutsu.gif` montre un jet puis une boule de feu **ajoutés uniquement dans l'aperçu** pour visualiser le timing ;
 le `.blend` ne contient que l'animation du personnage (les effets de feu ne s'exportent pas avec les os).
@@ -50,5 +50,7 @@ python tools/anim/r6_idles.py tools/anim/source/R6IKFIX.blend animations Tanjiro
 python tools/anim/preview.py animations/Idle_Tanjiro.blend animations/previews/Idle_Tanjiro.gif 10 260   # aperçu GIF
 python tools/anim/r6_jutsu.py tools/anim/source/R6IKFIX.blend animations                  # techniques (Katon...)
 python tools/anim/jitter_check.py animations/Idle_Tanjiro.blend                              # mesure des vibrations
+python tools/anim/calibrate_katon.py tools/anim/source/R6IKFIX.blend                       # recalcule l'angle qui joint les mains (Katon)
+python tools/anim/check_contact.py animations/Jutsu_Katon_GoukakyuuNoJutsu.blend 0.62 2.45  # vérifie le contact des bras
 ```
 (nécessite le module Python `bpy` : `pip install bpy`.)
