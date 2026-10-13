@@ -4,8 +4,8 @@ Techniques / attaques R6 (une action par fichier), sur le rig R6IKFIX.
     python tools/anim/r6_jutsu.py <rig.blend> <dossier_sortie> [Nom ...]
 
 Même repère et mêmes conventions que r6_idles.py (le personnage regarde vers +Y).
-Remarque jambes : dans le rig, les jambes IK sont tendues au repos ; on garde donc une posture légèrement fléchie
-dès la première image (jamais de passage par la jambe droite) pour éviter tout « claquement » de genou.
+Remarque jambes : dans le rig, les jambes IK sont tendues au repos ; on garde donc une posture fléchie (position basse)
+dès la première image et jusqu'à la dernière, sans jamais repasser par la jambe droite, pour éviter tout « claquement » de genou.
 """
 import os
 import sys
@@ -15,47 +15,49 @@ from r6_idles import arm, build, track   # noqa: E402
 
 
 def katon(t):
-    """Katon : Gōkakyū no Jutsu (Grande boule de feu) des Uchiha.
-    Position prête (jambes écartées, fléchies) -> 6 mains rapides (Serpent, Bélier, Singe, Sanglier, Cheval, Tiger) ->
-    grande inspiration (buste en arrière, tête levée) -> souffle explosif (buste projeté en avant, mains devant la bouche,
-    recul d'un pied) -> maintien du jet -> retour à la position prête (début = fin : peut s'enchaîner / boucler)."""
-    # --- bras : lever vers l'avant (fwd) et rapprochement vers l'axe du corps (inward) ---
-    fwd = [(0, 10), (0.35, 10), (0.52, 52), (0.68, 52),      # Serpent
-           (0.78, 84), (0.92, 84),                           # Bélier
-           (1.02, 62), (1.16, 62),                           # Singe
-           (1.26, 46), (1.40, 46),                           # Sanglier
-           (1.50, 88), (1.64, 88),                           # Cheval
-           (1.76, 108), (2.15, 112),                         # Tigre, tenu pendant l'inspiration
-           (2.40, 124), (3.30, 118),                         # souffle
-           (3.95, 10), (4.4, 10)]
-    inward = [(0, 6), (0.35, 6), (0.52, 34), (0.68, 34), (0.78, 38), (0.92, 38), (1.02, 28), (1.16, 28),
-              (1.26, 44), (1.40, 44), (1.50, 40), (1.64, 40), (1.76, 42), (2.15, 42), (2.40, 40), (3.30, 38),
-              (3.95, 6), (4.4, 6)]
-    f = track(t, fwd)
-    a = track(t, inward)
-    # --- torse (tangage : - = penché en avant, + = en arrière) ---
-    pitch = track(t, [(0, -3), (0.35, -3), (0.52, -5), (1.64, -5), (1.76, -4), (2.20, 14), (2.40, -24), (3.30, -19), (3.95, -3), (4.4, -3)])
-    yaw = track(t, [(0, 0), (0.52, 2), (0.78, -2), (1.02, 2), (1.26, -2), (1.50, 2), (1.76, 0), (2.20, 0), (2.40, 4), (3.30, -3), (3.95, 0), (4.4, 0)])
-    z = track(t, [(0, -0.10), (1.76, -0.10), (2.20, -0.08), (2.40, -0.16), (3.30, -0.14), (3.95, -0.10), (4.4, -0.10)])
-    # --- tête (orientation monde) : regarde ses mains, se renverse à l'inspiration, fixe la cible ---
-    head = track(t, [(0, -6), (0.35, -6), (0.52, -10), (1.64, -10), (1.76, -8), (2.20, 12), (2.40, 3), (3.30, 9), (3.95, -4), (4.4, -6)])
-    # --- pieds (cibles IK) : appui large, le pied droit recule au moment du souffle ---
-    lx = track(t, [(0, -0.25), (2.20, -0.25), (2.40, -0.35), (3.30, -0.35), (3.95, -0.25), (4.4, -0.25)])
-    ly = track(t, [(0, 0.12), (2.20, 0.12), (2.40, 0.20), (3.30, 0.20), (3.95, 0.12), (4.4, 0.12)])
-    ry = track(t, [(0, -0.12), (2.20, -0.12), (2.40, -0.38), (3.30, -0.38), (3.95, -0.12), (4.4, -0.12)])
+    """Katon : Gōkakyū no Jutsu (Grande boule de feu) des Uchiha - d'après la séquence de référence (Obito / Kakashi).
+      0.00  position prête : très basse, jambes écartées, buste penché, épaule tournée, bras en « griffes »
+      0.50  six mains rapides devant la poitrine (Serpent, Bélier, Singe, Sanglier, Cheval, Tigre), regard sur les mains
+      2.10  grande inspiration : le buste se tord et se gonfle, les bras se rentrent contre le corps, la tête regarde la cible
+      3.00  le corps se ramasse (accroupi), puis
+      3.35  souffle explosif : buste projeté en avant (avec dépassement), tête relevée, bras tirés en arrière, recul d'un pied
+      3.75  jet maintenu (balayage lent) -> 4.75 relâchement -> 5.60 retour à la position prête (début = fin : s'enchaîne)."""
+    # --- bras (fwd : lever avant ; abd : écarté du corps, négatif = vers l'axe du corps) ---
+    seals_t = [0.62, 0.72, 0.82, 0.92, 1.02, 1.12, 1.22, 1.32, 1.42, 1.52, 1.62]
+    R_fwd = [(0, 8), (0.30, 8), (0.48, 20), (0.62, 53), (0.72, 53), (0.82, 87), (0.92, 87), (1.02, 65), (1.12, 65), (1.22, 49), (1.32, 49),
+             (1.42, 91), (1.52, 91), (1.62, 109), (2.05, 114), (2.70, 36), (3.00, 36), (3.35, 22), (3.50, -30), (3.75, -26), (4.75, -24), (5.20, 6), (5.6, 8)]
+    R_abd = [(0, 46), (0.30, 46), (0.48, 12), (0.62, -34), (0.72, -34), (0.82, -38), (0.92, -38), (1.02, -28), (1.12, -28), (1.22, -44), (1.32, -44),
+             (1.42, -40), (1.52, -40), (1.62, -42), (2.05, -42), (2.70, -25), (3.00, -25), (3.35, 6), (3.50, 16), (3.75, 14), (4.75, 14), (5.20, 12), (5.6, 46)]
+    L_fwd = [(0, 50), (0.30, 50), (0.48, 38), (0.62, 49), (0.72, 49), (0.82, 81), (0.92, 81), (1.02, 59), (1.12, 59), (1.22, 43), (1.32, 43),
+             (1.42, 85), (1.52, 85), (1.62, 105), (2.05, 110), (2.70, -20), (3.00, -20), (3.35, -8), (3.50, -34), (3.75, -30), (4.75, -26), (5.20, 6), (5.6, 50)]
+    L_abd = [(0, 30), (0.30, 30), (0.48, 10), (0.62, -34), (0.72, -34), (0.82, -38), (0.92, -38), (1.02, -28), (1.12, -28), (1.22, -44), (1.32, -44),
+             (1.42, -40), (1.52, -40), (1.62, -42), (2.05, -42), (2.70, 12), (3.00, 12), (3.35, 10), (3.50, 18), (3.75, 16), (4.75, 16), (5.20, 12), (5.6, 30)]
+    # --- torse ---
+    pitch = [(0, -6), (0.30, -6), (0.48, -10), (0.62, -9), (2.10, -9), (2.70, 10), (3.00, 10), (3.35, -4), (3.50, -43), (3.75, -36), (4.75, -33), (5.20, -12), (5.6, -6)]
+    yaw = [(0, 8), (0.30, 8), (0.55, 0), (0.72, 2.5), (0.92, -2.5), (1.12, 2.5), (1.32, -2.5), (1.52, 2.5), (1.70, 0), (2.10, 0), (2.70, 24), (3.00, 24),
+           (3.35, 10), (3.50, 0), (3.75, 2), (4.75, -4), (5.20, 0), (5.6, 8)]
+    z = [(0, -0.22), (0.30, -0.22), (0.48, -0.27), (2.10, -0.27), (2.70, -0.30), (3.35, -0.34), (3.50, -0.36), (4.75, -0.35), (5.20, -0.27), (5.6, -0.22)]
+    recoil = [(0, 0), (3.35, 0), (3.50, -0.10), (3.90, 0.0), (5.6, 0)]
+    # --- tête (orientation monde) ---
+    h_pitch = [(0, 0), (0.30, 0), (0.48, -8), (0.62, -12), (2.10, -12), (2.70, 8), (3.00, 8), (3.35, -4), (3.50, 8), (3.75, 7), (4.75, 10), (5.20, -4), (5.6, 0)]
+    h_yaw = [(0, -8), (0.30, -8), (0.55, 0), (2.10, 0), (2.70, -24), (3.00, -24), (3.35, -8), (3.50, 0), (4.75, 0), (5.20, 0), (5.6, -8)]
+    # --- pieds (cibles IK) : appui large, le pied droit recule au souffle ---
+    lx = [(0, -0.75), (2.70, -0.75), (3.35, -0.95), (4.75, -0.95), (5.20, -0.80), (5.6, -0.75)]
+    ly = [(0, 0.10), (3.35, 0.10), (3.50, 0.22), (4.75, 0.22), (5.20, 0.12), (5.6, 0.10)]
+    ry = [(0, -0.10), (3.35, -0.10), (3.50, -0.42), (4.75, -0.42), (5.20, -0.12), (5.6, -0.10)]
     d = {}
-    d["Torso"] = dict(rot=(pitch, 0, yaw), loc=(0, 0, z))
-    d["Head"] = dict(rot=(head, 0, 0))
-    d["RightUpperArm"] = dict(rot=arm(1, fwd=f + 3, abd=-a))
-    d["LeftUpperArm"] = dict(rot=arm(-1, fwd=f - 3, abd=-a))
-    d["LeftLeg-IKTarget"] = dict(loc=(lx, ly, 0))
-    d["RightLeg-IKTarget"] = dict(loc=(-lx, ry, 0))
+    d["Torso"] = dict(rot=(track(t, pitch), 0, track(t, yaw)), loc=(0, track(t, recoil), track(t, z)))
+    d["Head"] = dict(rot=(track(t, h_pitch), 0, track(t, h_yaw)))
+    d["RightUpperArm"] = dict(rot=arm(1, fwd=track(t, R_fwd), abd=track(t, R_abd)))
+    d["LeftUpperArm"] = dict(rot=arm(-1, fwd=track(t, L_fwd), abd=track(t, L_abd)))
+    d["LeftLeg-IKTarget"] = dict(loc=(track(t, lx), track(t, ly), 0))
+    d["RightLeg-IKTarget"] = dict(loc=(-track(t, lx), track(t, ry), 0))
     return d
 
 
 # nom -> (fonction de pose, durée en s, pas entre clés en images, description)
 JUTSU = {
-    "Katon_GoukakyuuNoJutsu": (katon, 4.4, 2, "Katon : Grande boule de feu (Uchiha)"),
+    "Katon_GoukakyuuNoJutsu": (katon, 5.6, 2, "Katon : Grande boule de feu (Uchiha)"),
 }
 
 if __name__ == "__main__":

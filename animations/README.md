@@ -23,11 +23,11 @@ Aperçus (vue 3/4 + vue de côté, couleurs de test seulement) : `previews/Idle_
 
 | Fichier | Technique | Durée | Contenu |
 |---|---|---|---|
-| `Jutsu_Katon_GoukakyuuNoJutsu.blend` | **Katon : Grande boule de feu** (Uchiha) | 4,4 s | Position prête (jambes écartées, fléchies) → **6 mains rapides** (Serpent, Bélier, Singe, Sanglier, Cheval, Tigre) → **grande inspiration** (buste en arrière, tête levée) → **souffle explosif** (buste projeté en avant, mains devant la bouche, recul du pied droit) → maintien du jet → retour à la position prête. Début = fin : s'enchaîne ou boucle. |
+| `Jutsu_Katon_GoukakyuuNoJutsu.blend` | **Katon : Grande boule de feu** (Uchiha) | 5,6 s | Refait d'après la séquence de référence (Obito / Kakashi) : **position prête** très basse, jambes largement écartées, épaule tournée, bras en « griffes » → **six mains rapides** devant la poitrine (Serpent, Bélier, Singe, Sanglier, Cheval, Tigre) → **grande inspiration** : le buste se tord et se gonfle, les bras se rentrent contre le corps, la tête regarde la cible → le corps se ramasse → **souffle explosif** : buste projeté en avant (avec dépassement), tête relevée, **bras tirés en arrière**, recul du pied droit → **jet maintenu** (balayage lent) → relâchement → retour à la position prête. Début = fin : s'enchaîne ou boucle. |
 
-L'aperçu `previews/Jutsu_Katon_GoukakyuuNoJutsu.gif` montre une boule de feu **ajoutée uniquement dans l'aperçu** pour visualiser le timing ;
+L'aperçu `previews/Jutsu_Katon_GoukakyuuNoJutsu.gif` montre un jet puis une boule de feu **ajoutés uniquement dans l'aperçu** pour visualiser le timing ;
 le `.blend` ne contient que l'animation du personnage (les effets de feu ne s'exportent pas avec les os).
-Le souffle part à `t = 2,40 s` (image 144 à 60 fps).
+Repères de timing (60 images/s) : sceaux de 0,6 s à 2,1 s · inspiration 2,1 → 3,0 s · le souffle claque à 3,35 → 3,5 s (images 201 à 210) · jet jusqu'à 4,75 s.
 
 ## Détails techniques
 - 60 images/seconde (comme votre fichier), image de début 0. Les animations **bouclent parfaitement** (dernière image = première).

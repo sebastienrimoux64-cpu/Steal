@@ -40,24 +40,47 @@ def fire_mat(name, col, strength):
 def sphere(name, mat):
     bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=24, ring_count=12)
     o = bpy.context.object; o.name = name; o.data.materials.append(mat); bpy.ops.object.shade_smooth(); return o
-outer = sphere("fire_outer", fire_mat("fo", (1.0, 0.18, 0.02), 2.2))
-inner = sphere("fire_inner", fire_mat("fi", (1.0, 0.55, 0.08), 4.0))
+def make_blob(tag):
+    return (sphere(tag + "_outer", fire_mat(tag + "o", (1.0, 0.18, 0.02), 2.4)), sphere(tag + "_inner", fire_mat(tag + "i", (1.0, 0.55, 0.08), 4.2)))
+jet, ball = make_blob("jet"), make_blob("ball")
 light = bpy.data.objects.new("fl", bpy.data.lights.new("fl", "POINT")); light.data.energy = 0; light.data.color = (1.0, 0.45, 0.1); scn.collection.objects.link(light)
 def smooth(x): x = max(0.0, min(1.0, x)); return x * x * (3 - 2 * x)
+def show(blob, center, sc, vis):
+    for k, o in enumerate(blob):
+        o.hide_render = not vis
+        if vis:
+            f = 1.0 if k == 0 else 0.62
+            o.location = center; o.scale = (sc[0] * f, sc[1] * f, sc[2] * f)
+def mouth_pos():
+    bpy.context.view_layer.update()
+    h = bpy.data.objects["Head"].evaluated_get(bpy.context.evaluated_depsgraph_get())
+    pts = [h.matrix_world @ v.co for v in h.data.vertices]
+    c = sum(pts, Vector()) / len(pts)
+    return c + Vector((0, 0.75, -0.2))
 def fire(t):
-    t0, t_grow, t_end = 2.36, 3.05, 3.95
-    if t < t0 or t > t_end:
-        outer.hide_render = inner.hide_render = True; light.data.energy = 0; return
-    outer.hide_render = inner.hide_render = False
-    u = smooth((t - t0) / (t_grow - t0)); v = smooth((t - t0) / (t_end - t0)); fade = 1 - smooth((t - 3.3) / (t_end - 3.3))
-    r = (0.22 + 1.75 * u) * (0.30 + 0.70 * fade)
-    pos = Vector((0, 1.5 + 8.5 * v, 4.0 - 0.3 * v))
-    outer.location = pos + Vector((0, r * 0.35, 0)); outer.scale = (r, r * 1.25, r)
-    inner.location = pos + Vector((0, r * 0.2, 0)); inner.scale = (r * 0.55, r * 0.72, r * 0.55)
-    light.location = pos; light.data.energy = 5000 * (r / 2.0) ** 2 * fade
+    t0 = 3.45
+    m = mouth_pos() if t >= t0 - 0.05 else Vector((0, 1.0, 4.0))
+    # jet : sort de la bouche et s'allonge
+    if t0 <= t <= 4.7:
+        u = smooth((t - t0) / 0.9); fade = 1 - smooth((t - 4.2) / 0.5)
+        L = (0.2 + 3.6 * u) ; r = (0.16 + 0.8 * u) * (0.3 + 0.7 * fade)
+        show(jet, m + Vector((0, L / 2, 0)), (r, L / 2 + r * 0.4, r), True)
+    else:
+        show(jet, m, (1, 1, 1), False)
+    # boule : grossit et file vers l'avant
+    if 4.0 <= t <= 5.6:
+        v = (t - 4.0) / 1.6; fade = 1 - smooth((t - 5.0) / 0.6)
+        r = (0.5 + 1.5 * smooth(v * 1.5)) * (0.25 + 0.75 * fade)
+        c = Vector((0, m.y + 2.8 + 7.5 * smooth(v), m.z - 0.2 + 0.2 * v))
+        show(ball, c, (r, r * 1.2, r), True)
+        light.location = c; light.data.energy = 4500 * (r / 2.0) ** 2 * fade
+    else:
+        show(ball, m, (1, 1, 1), False)
+        light.data.energy = 3000 * (1 - abs(smooth((t - 3.9) / 0.4) * 2 - 1)) if 3.45 <= t <= 4.35 else 0
+        if 3.45 <= t <= 4.35: light.location = m + Vector((0, 1.5, 0))
 
 cam = bpy.data.objects.new("c", bpy.data.cameras.new("c")); cam.data.lens = 36; scn.collection.objects.link(cam); scn.camera = cam
-views = [((-8.0, 9.5, 5.6), (0, 2.8, 3.3)), ((16.0, 3.5, 4.0), (0, 3.5, 3.2))]
+views = [((-5.5, 10.5, 4.8), (0, 2.6, 3.0)), ((16.0, 3.5, 4.0), (0, 3.5, 3.2))]
 f0, f1 = scn.frame_start, scn.frame_end
 n = int(round((f1 - f0) / scn.render.fps * fps))
 tmp = tempfile.mkdtemp(); frames = []
