@@ -61,20 +61,14 @@ Chaque bijū est un dictionnaire dans `tools/make_bijuu.py` (tailles, couleurs, 
 - Les jambes R6 sont coupées au genou ; Shidou a des cheveux en pointes rouge sombre ajoutés sur la tête. Aucun morceau ne traverse le sol (vérifié sur la géométrie réelle des 507 images).
 - Aperçus : `apercu/Shidou_Ciseau_Retourne.gif`, `apercu/Shidou_planche.png`, `apercu/Shidou_rendu_eevee.png`.
 
-## Fruits du démon (One Piece) en cubes
-`models/Fruits_du_Demon.blend` : **26 fruits du démon en cubes**, chacun avec **sa propre forme** et la peau de l'œuvre : **plein de petites spirales serrées** qui couvrent tout le fruit (motif de type *karakusa*, volutes « en S » dont les voisines tournent en sens inverse), et non quelques grosses spirales. Présentoirs en gradins avec le nom de chaque fruit. Scène statique, faite avec Blender 5.2.
+## Fruits du démon (One Piece) : modèles lisses
+`models/Fruits_du_Demon.blend` : **26 fruits du démon**, chacun avec **sa propre forme** et la peau de l'œuvre : **plein de petites spirales serrées** sur tout le fruit (motif de type *karakusa*, volutes « en S » dont les voisines tournent en sens inverse). Plus de pixels ni de cubes : ce sont des **modèles lisses construits à partir de pièces**. Présentoirs avec le nom de chaque fruit. Scène statique, faite avec Blender 5.2.
 
-**Tout est fusionné pour être léger** :
-| | 1re version | maintenant |
-|---|---|---|
-| faces à afficher (26 fruits) | 141 000 | **15 300** |
-| objets | 26 fruits + 52 présentoirs + 26 textes | **26 fruits + 1 présentoir (étiquettes comprises) + 1 sol** |
-| poids du fichier | 2,5 Mo | **0,9 Mo** |
-
-- Chaque fruit est **un seul maillage** de gros cubes (27 cm) : toutes les faces voisines dans le même plan sont fondues en un seul grand rectangle, les faces cachées n'existent pas, les sommets sont partagés (~600 faces par fruit).
-- Les détails fins (petites spirales, taches du léopard, nervures des feuilles, côtes du cactus, fissures…) ne sont plus faits de milliers de petits cubes : ils sont **peints sur une seule petite texture pixelisée** (`Fruits_atlas`, 256×2048, rangée dans le fichier) partagée par les 26 fruits. Chaque pixel correspond à un cube de 9 cm du modèle détaillé. Les spirales sont donc à plat (plus en relief). Sur les fruits à segments (framboise, magma, grappe, ananas) chaque bosse ou écaille porte sa propre mini-spirale. Taille des spirales : constante `SWIRL` du script.
+- Chaque fruit est **un seul maillage lisse** (~2 000 faces en moyenne) assemblé à partir de pièces fusionnées : corps (surface de révolution ou surface implicite : cœur, poire, pêche…), tiges et feuilles (tubes), cornes, pointes, pétales, lames, bosses…
+- La peau est **une seule petite texture de spirales** (seamless, 1024 px, rangée dans le fichier) projetée en « box » sur l'objet, avec un léger relief (bump) : aucune UV, quasi aucun poids. Chaque fruit a sa couleur de base et sa couleur de spirales ; tiges, cornes, etc. ont une couleur unie. Taille des spirales : constante `SW` du script.
 - Les 26 présentoirs, leurs plateaux et leurs noms forment **un seul objet** (`Presentoirs`).
-- Plus fin (cubes de 18 cm, ~34 000 faces, ~1,6 Mo) : `python tools/make_fruits_demon.py SORTIE.blend --k=2`.
+- Poids : ~54 000 faces au total, fichier **~1,6 Mo**.
+
 
 | Fruit | Forme |
 |---|---|
@@ -85,7 +79,7 @@ Chaque bijū est un dictionnaire dans `tools/make_bijuu.py` (tailles, couleurs, 
 | Ito Ito | poire lilas, tige fuchsia en vrille |
 | Doru Doru | poire blanche fondue en haut comme une bougie |
 | Ushi Ushi (Bison) | fraise noire à deux cornes |
-| Neko Neko (Léopard) | tête de léopard (oreilles à spirales, taches) |
+| Neko Neko (Léopard) | tête de léopard (oreilles, taches en rosettes) |
 | Nikyu Nikyu | rond rose à trois bosses (patte) |
 | Hana Hana | fleur rose (dahlia) |
 | Suna Suna | cactus tonneau à côtes, deux petits bras |
