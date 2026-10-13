@@ -53,3 +53,10 @@ Chaque bijū est un dictionnaire dans `tools/make_bijuu.py` (tailles, couleurs, 
 - Résultat : saut de 0,58 m, 0,71 s de vol, 338° de rotation avant le toucher, pieds sans glissement au contact, aucun morceau qui traverse le sol (vérifié sur la géométrie réelle des 240 images).
 - Les jambes R6 sont coupées en deux (cuisse / mollet) pour fléchir les genoux. Les rigs d'origine restent dans le fichier mais sont cachés.
 - Aperçus : `apercu/R6_Salto_Arriere.gif`, `apercu/R6_Salto_Arriere_planche.png`, `apercu/R6_Salto_physique.png` (hauteur du centre de masse vs parabole théorique, rotation, vitesse de rotation).
+
+## Shidou Ryusei (Blue Lock) : « Ciseau retourné »
+`models/Shidou_Ciseau_Retourne.blend` : 507 images à 60 i/s (8,4 s), caméra animée `Camera_Shidou` (+ `Camera_Profil` fixe), but avec filet, ballon, pelouse avec lignes, soleil bas et flash rouge à la frappe.
+- **Scénario** : Shidou guette dans la surface, courbé comme un prédateur (tics de la tête et des mains) ; un centre en cloche arrive ; il s'élance et reprend le ballon en **ciseau retourné** (finition acrobatique, frappe type « Drive Shot ») ; le tir part dans la lucarne **en ralenti dramatique** ; il retombe sur le dos, **rit comme un fou** (le corps tremble), se relève et se fige bras écartés, tête renversée : l'extase du but.
+- **Physique simulée** (`tools/make_shidou_r6.py`, option `--sim` pour les diagnostics) : décollage détecté par la physique, centre de masse parabolique (g = 28 u/s²), moment cinétique conservé (la rotation est recalculée à chaque instant), fouetté de jambe qui absorbe une grande partie du moment cinétique, rotation au décollage calculée pour que le pied rencontre le ballon à l'instant de la frappe. Le ballon suit aussi une balistique exacte (centre de 12 m, tir à 70 u/s ≈ 24 m/s résolu pour la lucarne, filet, rebonds).
+- Les jambes R6 sont coupées au genou ; Shidou a des cheveux en pointes rouge sombre ajoutés sur la tête. Aucun morceau ne traverse le sol (vérifié sur la géométrie réelle des 507 images).
+- Aperçus : `apercu/Shidou_Ciseau_Retourne.gif`, `apercu/Shidou_planche.png`, `apercu/Shidou_rendu_eevee.png`.
