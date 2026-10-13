@@ -60,3 +60,11 @@ Chaque bijū est un dictionnaire dans `tools/make_bijuu.py` (tailles, couleurs, 
 - **Physique simulée** (`tools/make_shidou_r6.py`, option `--sim` pour les diagnostics) : décollage détecté par la physique, centre de masse parabolique (g = 28 u/s²), moment cinétique conservé (la rotation est recalculée à chaque instant), fouetté de jambe qui absorbe une grande partie du moment cinétique, rotation au décollage calculée pour que le pied rencontre le ballon à l'instant de la frappe. Le ballon suit aussi une balistique exacte (centre de 12 m, tir à 70 u/s ≈ 24 m/s résolu pour la lucarne, filet, rebonds).
 - Les jambes R6 sont coupées au genou ; Shidou a des cheveux en pointes rouge sombre ajoutés sur la tête. Aucun morceau ne traverse le sol (vérifié sur la géométrie réelle des 507 images).
 - Aperçus : `apercu/Shidou_Ciseau_Retourne.gif`, `apercu/Shidou_planche.png`, `apercu/Shidou_rendu_eevee.png`.
+
+## Fruits du démon (One Piece) en cubes
+`models/Fruits_du_Demon.blend` : **24 fruits du démon en voxels** (cubes de 18 cm), avec la **peau à spirales en relief** : chaque fruit porte plusieurs tourbillons (un grand face à la caméra), dessinés en cubes recolorés et surélevés d'un cran, plus une tige recourbée et une petite feuille. 6 formes (ronde, ovale, poire, gourde, aplatie, pomme, lobée) et une couleur par fruit. Les fruits sont posés sur des présentoirs en gradins avec leur nom en relief.
+- Gomu Gomu, Mera Mera, Hie Hie, Pika Pika, Yami Yami, Magu Magu, Gura Gura, Ope Ope, Goro Goro, Suna Suna, Hana Hana, Bara Bara, Doku Doku, Mochi Mochi, Yomi Yomi, Kage Kage, Hobby Hobby, Neko Neko, Tori Tori, Zou Zou, Bomu Bomu, Horu Horu, Nikyu Nikyu, Hito Hito no Mi (Nika).
+- Chaque fruit est un objet séparé (`Fruit_<nom>`, collection « Fruits ») : déplacez-le, copiez-le ou exportez-le. Couleurs en attribut de couleur « Col » (mode Vertex Paint, ou export glTF).
+- Caméras : `Camera_Ensemble` (par défaut) et `Camera_GrosPlan`. Scène statique (pas d'animation).
+- Régénérer : `python tools/make_fruits_demon.py SORTIE.blend [SORTIE.glb]`. Les couleurs sont inspirées de l'œuvre (elles varient selon l'anime et le manga).
+- Aperçus : `apercu/Fruits_du_Demon_vue_ensemble.png`, `apercu/Fruits_du_Demon_gros_plans.png`.
