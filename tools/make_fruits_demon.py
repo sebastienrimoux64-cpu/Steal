@@ -1,22 +1,21 @@
-"""Fruits du démon (One Piece) en cubes : chaque fruit a SA forme, ses spirales en relief, et un maillage léger.
+"""Fruits du démon (One Piece) en cubes : une forme par fruit, spirales fines, et un fichier LÉGER.
 
 Usage :
-    python tools/make_fruits_demon.py SORTIE.blend                 # version COMPACTE (par défaut, ~1 Mo)
-    python tools/make_fruits_demon.py SORTIE.blend --mode=mesh --scale=1.4   # vrai maillage optimisé (export)
-    python tools/make_fruits_demon.py --stats                      # compte les cubes / faces, sans Blender
+    python tools/make_fruits_demon.py SORTIE.blend            # défaut : cubes de 27 cm (--k=3), ~15 000 faces
+    python tools/make_fruits_demon.py SORTIE.blend --k=2      # cubes de 18 cm : plus fin, ~34 000 faces
+    python tools/make_fruits_demon.py --stats                 # compte les faces, sans Blender
 
 Les formes suivent les descriptions de l'œuvre (cœur, poire, fraise à cornes, tête de léopard, cactus,
-framboise, yo-yo, régime de lames, ananas…). Les spirales (motif de peau de tous les fruits) sont de vrais
-reliefs : les cubes de la spirale sont recolorés ET surélevés.
+framboise, yo-yo, régime de lames, ananas…).
 
-Détail et poids :
-  * les cubes sont petits (SCALE = 2 : 9 cm) pour des spirales et des silhouettes fines ;
-  * mode « gn » (par défaut) : le fichier ne contient qu'UN POINT COLORÉ PAR CUBE visible (les cubes cachés à
-    l'intérieur n'existent pas) ; un modificateur « Nœuds de géométrie » (partagé par tous les fruits) fabrique
-    les cubes à l'ouverture. Résultat : ~1 Mo pour les 26 fruits. Pour obtenir un maillage classique :
-    Objet > Appliquer > Modificateur visuel ;
-  * mode « mesh » : vrai maillage « glouton » (les faces voisines de même couleur sont fusionnées, les sommets
-    partagés, une couleur par face), adapté à l'export vers d'autres logiciels.
+Optimisation (tout est FUSIONNÉ) :
+  * chaque fruit = UN SEUL maillage de gros cubes, dont toutes les faces coplanaires voisines sont fondues en
+    grands rectangles (les faces cachées n'existent pas, les sommets sont partagés) ;
+  * les détails fins (spirales, taches, nervures, côtes…) ne sont plus faits de milliers de petits cubes : ils
+    sont peints sur UNE SEULE petite texture pixelisée partagée par les 26 fruits (« atlas ») ; chaque pixel de
+    l'atlas est un cube fin (9 cm), pris par un rayon lancé dans le modèle détaillé ;
+  * les 26 présentoirs, plateaux et étiquettes ne forment qu'un seul objet (étiquettes dans une seconde image).
+Nécessite le module Pillow (pour les étiquettes) et numpy (fournis avec `pip install bpy`).
 
 Sources : descriptions des wikis (One Piece Wiki et dérivés) retrouvées par recherche web. Certains fruits
 ont des designs contradictoires selon les sources, ou non officiels (voir README) ; les couleurs varient
@@ -299,6 +298,7 @@ def paint(parts, seed):
         else:
             out[k] = qcol(shade(base, lit))
     out.update(raised)
+    solid = set(occ)
     for part in parts:                                                    # fissures, côtes, etc. appliquées après coup
         if part.crack:
             for k in list(out):
@@ -306,7 +306,7 @@ def paint(parts, seed):
                     col = part.crack(bc(k))
                     if col is not None:
                         out[k] = qcol(col)
-    return out
+    return out, solid
 
 
 def lumps_fn(centers, rl, base, ring, dot_col=None):
@@ -760,15 +760,158 @@ FRUITS = [
 
 
 def make_fruit(i):
+    """(cubes fins colorés, ensemble plein) du fruit i."""
     return paint(FRUITS[i][1](), seed=1000 + 17 * i)
 
 
-# ======================================================================= maillage glouton
-def greedy_mesh(vox):
-    """Fusionne les faces visibles voisines de même couleur en rectangles.
-    Renvoie (sommets entiers en demi-cubes, faces (indices), couleur de chaque face)."""
-    verts, vid = [], {}
-    faces, fcol = [], []
+# ======================================================================= fusion : maillage grossier + une texture
+def _k_arg(default):
+    for a in sys.argv[1:]:
+        if a.startswith("--k="):
+            return int(a.split("=", 1)[1])
+    return default
+
+
+K = _k_arg(3)               # cubes fins fusionnés dans un cube du maillage (K=3 : 27 cm ; K=2 : 18 cm, plus fin)
+
+
+def coarse_solid(solid):
+    """Maillage grossier : un gros cube est plein si assez de cubes fins le sont (les fines tiges survivent)."""
+    cnt = {}
+    for k in solid:
+        c = (k[0] // K, k[1] // K, k[2] // K)
+        cnt[c] = cnt.get(c, 0) + 1
+    need = max(2, round(0.375 * K ** 3))
+    return {c for c, n in cnt.items() if n >= need}
+
+
+def greedy_quads(cells):
+    """Rectangles de faces visibles, couleur ignorée (la couleur vient de la texture) :
+    [(axe, signe, plan, u0, v0, largeur, hauteur)] en indices de gros cubes."""
+    quads = []
+    for axis in range(3):
+        u, v = (axis + 1) % 3, (axis + 2) % 3
+        for sign in (1, -1):
+            planes = {}
+            for c in cells:
+                nb = list(c)
+                nb[axis] += sign
+                if tuple(nb) not in cells:
+                    planes.setdefault(c[axis], set()).add((c[u], c[v]))
+            for s, cs in planes.items():
+                done = set()
+                for cu, cv in sorted(cs):
+                    if (cu, cv) in done:
+                        continue
+                    w = 1
+                    while (cu + w, cv) in cs and (cu + w, cv) not in done:
+                        w += 1
+                    h = 1
+                    while all((cu + i, cv + h) in cs and (cu + i, cv + h) not in done for i in range(w)):
+                        h += 1
+                    for i in range(w):
+                        for j in range(h):
+                            done.add((cu + i, cv + j))
+                    quads.append((axis, sign, s, cu, cv, w, h))
+    return quads
+
+
+def sample_patch(fine, q):
+    """Couleurs d'un rectangle : pour chaque texel (un cube fin), on lance un rayon vers l'intérieur
+    et on prend le premier cube fin coloré touché (relief des spirales compris)."""
+    axis, sign, s, cu, cv, w, h = q
+    u, v = (axis + 1) % 3, (axis + 2) % 3
+    W, H = w * K, h * K
+    outer = s * K + K if sign > 0 else s * K - 1
+    steps = RELIEF + 2 * K + 1
+    rows = []
+    for j in range(H):
+        fv = cv * K + j
+        row = []
+        for i in range(W):
+            fu = cu * K + i
+            col = None
+            for d in range(steps):
+                key = [0, 0, 0]
+                key[axis] = outer + sign * (RELIEF - d)
+                key[u], key[v] = fu, fv
+                col = fine.get(tuple(key))
+                if col is not None:
+                    break
+            row.append(col)
+        last = None
+        for i in range(W):                                    # trous (rares) : couleur du voisin
+            if row[i] is None:
+                row[i] = last
+            else:
+                last = row[i]
+        for i in range(W - 1, -1, -1):
+            if row[i] is None:
+                row[i] = row[i + 1] if i + 1 < W and row[i + 1] is not None else (0.55, 0.55, 0.55)
+        rows.append(row)
+    return rows
+
+
+def pack_patches(sizes):
+    """Range des rectangles (largeur, hauteur) dans une texture : renvoie (positions, largeur, hauteur)."""
+    order = sorted(range(len(sizes)), key=lambda i: -sizes[i][1])
+    best = None
+    for AW in (256, 512, 1024, 2048, 4096):
+        if max(w for w, _ in sizes) > AW:
+            continue
+        pos = [None] * len(sizes)
+        x = y = rowh = 0
+        for i in order:
+            w, h = sizes[i]
+            if x + w > AW:
+                x, y, rowh = 0, y + rowh, 0
+            pos[i] = (x, y)
+            x += w
+            rowh = max(rowh, h)
+        AH = 1
+        while AH < y + rowh:
+            AH *= 2
+        if best is None or AW * AH < best[1] * best[2]:
+            best = (pos, AW, AH)
+    return best
+
+
+def hc(c):
+    """Coordonnée (en u) d'une arête de gros cube repérée en demi-cubes."""
+    return (c * 0.5 * K + (K - 1) / 2) * VOX
+
+
+def build_fruit_data():
+    """Calcule, pour tous les fruits : maillage grossier fusionné, textures, atlas."""
+    import numpy as np
+    data = []
+    for i, (name, _) in enumerate(FRUITS):
+        fine, solid = make_fruit(i)
+        quads = greedy_quads(coarse_solid(solid))
+        patches = [sample_patch(fine, q) for q in quads]
+        data.append((name, len(fine), quads, patches))
+    sizes = [(len(p[0]), len(p)) for d in data for p in d[3]]
+    pos, AW, AH = pack_patches(sizes)
+    atlas = np.full((AH, AW, 4), 140, dtype=np.uint8)
+    atlas[..., 3] = 255
+    n = 0
+    placed = []
+    for name, nf, quads, patches in data:
+        pp = []
+        for p in patches:
+            x, y = pos[n]
+            n += 1
+            arr = np.array([[[round(clamp(c, 0, 1) * 255) for c in px] for px in row] for row in p], dtype=np.uint8)
+            atlas[y:y + arr.shape[0], x:x + arr.shape[1], :3] = arr
+            pp.append((x, y))
+        placed.append(pp)
+    return data, placed, atlas, AW, AH
+
+
+def fruit_mesh(name, quads, places, AW, AH):
+    """Maillage d'un fruit : sommets partagés, un rectangle par plan fusionné, UV dans l'atlas."""
+    import bpy
+    verts, vid, faces, uvs = [], {}, [], []
 
     def vi(c):
         i = vid.get(c)
@@ -776,166 +919,74 @@ def greedy_mesh(vox):
             i = vid[c] = len(verts)
             verts.append(c)
         return i
-    for axis in range(3):
+    e = 0.002
+    for (axis, sign, s, cu, cv, w, h), (ax, ay) in zip(quads, places):
         u, v = (axis + 1) % 3, (axis + 2) % 3
-        for sign in (1, -1):
-            planes = {}
-            for key, col in vox.items():
-                nb = list(key)
-                nb[axis] += sign
-                if tuple(nb) in vox:
-                    continue
-                planes.setdefault(key[axis], {})[(key[u], key[v])] = col
-            for s, cells in planes.items():
-                done = set()
-                for cu, cv in sorted(cells):
-                    if (cu, cv) in done:
-                        continue
-                    col = cells[(cu, cv)]
-                    w = 1
-                    while cells.get((cu + w, cv)) == col and (cu + w, cv) not in done:
-                        w += 1
-                    h = 1
-                    while all(cells.get((cu + i, cv + h)) == col and (cu + i, cv + h) not in done for i in range(w)):
-                        h += 1
-                    for i in range(w):
-                        for j in range(h):
-                            done.add((cu + i, cv + j))
-                    a = 2 * s + sign                                       # plan de la face (en demi-cubes)
-                    u0, u1, v0, v1 = 2 * cu - 1, 2 * (cu + w - 1) + 1, 2 * cv - 1, 2 * (cv + h - 1) + 1
-                    quad = []
-                    for (pu, pv) in ((u0, v0), (u1, v0), (u1, v1), (u0, v1)):
-                        c = [0, 0, 0]
-                        c[axis], c[u], c[v] = a, pu, pv
-                        quad.append(vi(tuple(c)))
-                    if sign < 0:
-                        quad.reverse()
-                    faces.append(quad)
-                    fcol.append(col)
-    return verts, faces, fcol
-
-
-def voxel_mesh(name, vox):
-    """Maillage léger : sommets partagés, une couleur par face (attribut « Col »)."""
-    import bpy
-    verts, faces, fcol = greedy_mesh(vox)
+        a = 2 * s + sign
+        u0, u1, v0, v1 = 2 * cu - 1, 2 * (cu + w - 1) + 1, 2 * cv - 1, 2 * (cv + h - 1) + 1
+        W, H = w * K, h * K
+        quad, uv = [], []
+        for (pu, pv), (tu, tv) in zip(((u0, v0), (u1, v0), (u1, v1), (u0, v1)),
+                                      ((ax + e, ay + e), (ax + W - e, ay + e), (ax + W - e, ay + H - e), (ax + e, ay + H - e))):
+            c = [0, 0, 0]
+            c[axis], c[u], c[v] = a, pu, pv
+            quad.append(vi(tuple(c)))
+            uv.append((tu / AW, tv / AH))
+        if sign < 0:
+            quad.reverse()
+            uv.reverse()
+        faces.append(quad)
+        uvs.extend(uv)
     me = bpy.data.meshes.new(name)
-    h = VOX / 2
-    me.from_pydata([(c[0] * h, c[1] * h, c[2] * h) for c in verts], [], faces)
-    attr = me.color_attributes.new("Col", "BYTE_COLOR", "FACE")
-    flat = []
-    for c in fcol:
-        flat.extend((c[0], c[1], c[2], 1.0))
-    attr.data.foreach_set("color", flat)
+    me.from_pydata([(hc(c[0]), hc(c[1]), hc(c[2])) for c in verts], [], faces)
+    layer = me.uv_layers.new(name="UVMap")
+    layer.data.foreach_set("uv", [t for uv in uvs for t in uv])
     me.update()
     return me
 
 
-def cube_node_group(mat):
-    """Groupe de nœuds : points -> cubes (instances) de la taille d'un voxel, partagé par tous les fruits.
-    L'entrée « Maillage réel » transforme les instances en un vrai maillage (utile pour appliquer / exporter)."""
-    import bpy
-    ng = bpy.data.node_groups.new("Cubes_voxel", "GeometryNodeTree")
-    ng.interface.new_socket("Geometry", in_out="INPUT", socket_type="NodeSocketGeometry")
-    sock = ng.interface.new_socket("Maillage réel", in_out="INPUT", socket_type="NodeSocketBool")
-    sock.default_value = False
-    ng.interface.new_socket("Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
-    gi, go = ng.nodes.new("NodeGroupInput"), ng.nodes.new("NodeGroupOutput")
-    cube = ng.nodes.new("GeometryNodeMeshCube")
-    cube.inputs["Size"].default_value = (VOX, VOX, VOX)
-    setmat = ng.nodes.new("GeometryNodeSetMaterial")               # sans matériau, les cubes seraient gris
-    setmat.inputs["Material"].default_value = mat
-    iop = ng.nodes.new("GeometryNodeInstanceOnPoints")
-    real = ng.nodes.new("GeometryNodeRealizeInstances")
-    gi.location, cube.location, setmat.location, iop.location, real.location, go.location = (
-        (-500, 0), (-500, -200), (-300, -200), (-100, 0), (150, 0), (400, 0))
-    L = ng.links.new
-    L(gi.outputs["Geometry"], iop.inputs["Points"])
-    L(cube.outputs["Mesh"], setmat.inputs["Geometry"])
-    L(setmat.outputs["Geometry"], iop.inputs["Instance"])
-    L(iop.outputs["Instances"], real.inputs["Geometry"])
-    L(gi.outputs["Maillage réel"], real.inputs["Selection"])        # vrai : on réalise ; faux : cubes en instances
-    L(real.outputs["Geometry"], go.inputs[0])
-    return ng
-
-
-def point_mesh(name, vox):
-    """Un point coloré par cube visible (aucune face stockée) ; triés pour mieux se compresser."""
-    keys = sorted(vox)
-    me = __import__("bpy").data.meshes.new(name)
-    me.from_pydata([(k[0] * VOX, k[1] * VOX, k[2] * VOX) for k in keys], [], [])
-    attr = me.color_attributes.new("Col", "BYTE_COLOR", "POINT")
-    flat = []
-    for k in keys:
-        c = vox[k]
-        flat.extend((c[0], c[1], c[2], 1.0))
-    attr.data.foreach_set("color", flat)
-    return me
-
-
 def mesh_stats():
-    """Nombre de cubes, de faces avant fusion et de rectangles après fusion, pour chaque fruit."""
-    rows = []
-    for i, (name, _) in enumerate(FRUITS):
-        vox = make_fruit(i)
-        naive = sum(1 for k in vox for d in NEIGH if (k[0] + d[0], k[1] + d[1], k[2] + d[2]) not in vox)
-        verts, faces, _ = greedy_mesh(vox)
-        rows.append((name, len(vox), naive, len(faces), len(verts)))
-    return rows
+    data, placed, atlas, AW, AH = build_fruit_data()
+    rows = [(n, nf, len(q)) for n, nf, q, _ in data]
+    return rows, AW, AH
 
 
 # ======================================================================= scène
-def vertex_color_material(instanced=False):
-    """Matériau des fruits : lit la couleur « Col » (attribut de l'instance en mode gn, de la face sinon)."""
+def image_from_array(name, arr, interp_pack=True):
     import bpy
-    m = bpy.data.materials.new("Fruit_voxel")
+    AH, AW = arr.shape[0], arr.shape[1]
+    img = bpy.data.images.new(name, AW, AH, alpha=False)
+    img.pixels.foreach_set((arr.astype("float32") / 255.0).ravel())
+    img.file_format = "PNG"
+    img.pack()
+    return img
+
+
+def textured_material(name, img, closest=True, emission=0.0):
+    import bpy
+    m = bpy.data.materials.new(name)
     m.use_nodes = True
     nt = m.node_tree
     b = nt.nodes["Principled BSDF"]
-    b.inputs["Roughness"].default_value = 0.5
-    vc = nt.nodes.new("ShaderNodeVertexColor")                       # couleur du maillage réel / de la face
-    vc.layer_name = "Col"
-    if instanced:
-        # couleur de l'instance (cubes) + couleur du maillage réel : l'une des deux est noire, on les additionne
-        at = nt.nodes.new("ShaderNodeAttribute")
-        at.attribute_type = "INSTANCER"
-        at.attribute_name = "Col"
-        mix = nt.nodes.new("ShaderNodeMix")
-        mix.data_type = "RGBA"
-        mix.blend_type = "ADD"
-        mix.inputs["Factor"].default_value = 1.0
-        nt.links.new(at.outputs["Color"], mix.inputs["A"])
-        nt.links.new(vc.outputs["Color"], mix.inputs["B"])
-        nt.links.new(mix.outputs["Result"], b.inputs["Base Color"])
-    else:
-        nt.links.new(vc.outputs["Color"], b.inputs["Base Color"])
+    b.inputs["Roughness"].default_value = 0.55
+    t = nt.nodes.new("ShaderNodeTexImage")
+    t.image = img
+    t.interpolation = "Closest" if closest else "Linear"
+    nt.links.new(t.outputs["Color"], b.inputs["Base Color"])
+    if emission:
+        nt.links.new(t.outputs["Color"], b.inputs["Emission Color"])
+        b.inputs["Emission Strength"].default_value = emission
     return m
 
 
-def simple_material(name, color, rough=0.7, emission=0.0):
+def simple_material(name, color, rough=0.7):
     import bpy
     m = bpy.data.materials.new(name)
     m.use_nodes = True
     b = m.node_tree.nodes["Principled BSDF"]
     b.inputs["Base Color"].default_value = (*color, 1)
     b.inputs["Roughness"].default_value = rough
-    if emission:
-        b.inputs["Emission Color"].default_value = (*color, 1)
-        b.inputs["Emission Strength"].default_value = emission
     return m
-
-
-def add_box(name, lo, hi, mat):
-    import bpy
-    verts = [(x, y, z) for x in (lo[0], hi[0]) for y in (lo[1], hi[1]) for z in (lo[2], hi[2])]
-    faces = [(0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3)]
-    me = bpy.data.meshes.new(name)
-    me.from_pydata(verts, [], faces)
-    me.update()
-    me.materials.append(mat)
-    ob = bpy.data.objects.new(name, me)
-    bpy.context.scene.collection.objects.link(ob)
-    return ob
 
 
 def wood_floor():
@@ -959,6 +1010,28 @@ def wood_floor():
     return m
 
 
+def label_array(names):
+    """Étiquettes (texte doré sur fond brun) dans une petite image : une bande par fruit."""
+    import numpy as np
+    from PIL import Image, ImageDraw, ImageFont
+    LW, LH, cols = 256, 24, 4
+    rows = (len(names) + cols - 1) // cols
+    img = Image.new("RGB", (LW * cols, LH * rows), (66, 40, 20))
+    d = ImageDraw.Draw(img)
+    try:
+        font = ImageFont.load_default(size=15)
+    except TypeError:
+        font = ImageFont.load_default()
+    for i, n in enumerate(names):
+        r, c = divmod(i, cols)
+        box_ = d.textbbox((0, 0), n, font=font)
+        d.text((c * LW + (LW - (box_[2] - box_[0])) / 2, r * LH + (LH - (box_[3] - box_[1])) / 2 - box_[1]), n,
+               fill=(255, 205, 90), font=font)
+    arr = np.flipud(np.array(img))                               # Blender : l'axe v monte
+    rgba = np.concatenate([arr, np.full(arr.shape[:2] + (1,), 255, np.uint8)], axis=2)
+    return rgba, LW, LH, cols, rows
+
+
 COLS, DX, DY = 9, 7.9, 10.2
 
 
@@ -969,18 +1042,62 @@ def layout(i):
     return (col - (n - 1) / 2) * DX, row * DY, 1.5 + 2.8 * row
 
 
-def build(dst, mode="gn", glb=None):
+def stage_mesh(label_info):
+    """UN seul maillage pour les 26 présentoirs, leurs plateaux et leurs étiquettes."""
+    import bpy
+    rgba, LW, LH, cols, rows = label_info
+    verts, faces, mats, uvs = [], [], [], []
+
+    def add_box(lo, hi, mat):
+        b = len(verts)
+        for x in (lo[0], hi[0]):
+            for y in (lo[1], hi[1]):
+                for z in (lo[2], hi[2]):
+                    verts.append((x, y, z))
+        for f in ((0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3)):
+            faces.append(tuple(b + i for i in f))
+            mats.append(mat)
+            uvs.extend([(0, 0)] * 4)
+    for i in range(len(FRUITS)):
+        wx, wy, h = layout(i)
+        add_box((wx - 3.4, wy - 3.5, 0), (wx + 3.4, wy + 3.5, h), 0)
+        add_box((wx - 3.55, wy - 3.65, h), (wx + 3.55, wy + 3.65, h + 0.18), 1)
+        r, c = divmod(i, cols)
+        x0, y0 = c * LW / (LW * cols), (rows - 1 - r) * LH / (LH * rows)
+        x1, y1 = x0 + 1.0 / cols, y0 + 1.0 / rows
+        b, z = len(verts), h + 0.19
+        verts.extend([(wx - 3.2, wy - 3.35, z), (wx + 3.2, wy - 3.35, z), (wx + 3.2, wy - 2.75, z), (wx - 3.2, wy - 2.75, z)])
+        faces.append((b, b + 1, b + 2, b + 3))
+        mats.append(2)
+        uvs.extend([(x0, y0), (x1, y0), (x1, y1), (x0, y1)])
+    me = bpy.data.meshes.new("Presentoirs")
+    me.from_pydata(verts, [], faces)
+    me.polygons.foreach_set("material_index", mats)
+    me.uv_layers.new(name="UVMap").data.foreach_set("uv", [t for uv in uvs for t in uv])
+    me.update()
+    return me
+
+
+def build(dst):
     import bpy
     bpy.ops.wm.read_factory_settings(use_empty=True)
     sc = bpy.context.scene
     sc.render.resolution_x, sc.render.resolution_y = 1920, 1080
     sc.view_settings.view_transform = "Standard"
 
-    fmat = vertex_color_material(instanced=(mode == "gn"))
-    ng = cube_node_group(fmat) if mode == "gn" else None
-    wood = simple_material("Presentoir", (0.30, 0.17, 0.09), 0.7)
+    data, placed, atlas, AW, AH = build_fruit_data()
+    img = image_from_array("Fruits_atlas", atlas)
+    fmat = textured_material("Fruits", img, closest=True)
+    label = label_array([d[0] for d in data])
+    limg = image_from_array("Etiquettes", label[0])
+    lmat = textured_material("Etiquettes", limg, closest=False, emission=0.9)
+    wood = simple_material("Presentoir", (0.30, 0.17, 0.09))
     top = simple_material("Presentoir_dessus", (0.42, 0.25, 0.13), 0.6)
-    gold = simple_material("Or", (1.0, 0.78, 0.30), 0.35, emission=0.6)
+
+    stage = stage_mesh(label)
+    for m in (wood, top, lmat):
+        stage.materials.append(m)
+    sc.collection.objects.link(bpy.data.objects.new("Presentoirs", stage))
 
     floor = bpy.data.meshes.new("Sol")
     floor.from_pydata([(-160, -90, 0), (160, -90, 0), (160, 130, 0), (-160, 130, 0)], [], [(0, 1, 2, 3)])
@@ -989,41 +1106,24 @@ def build(dst, mode="gn", glb=None):
 
     coll = bpy.data.collections.new("Fruits")
     sc.collection.children.link(coll)
-    fruit_objs = []
-    for i, (name, _) in enumerate(FRUITS):
-        wx, wy, h = layout(i)
-        add_box(f"Presentoir_{i + 1:02d}", (wx - 3.4, wy - 3.5, 0), (wx + 3.4, wy + 3.5, h), wood)
-        add_box(f"Plateau_{i + 1:02d}", (wx - 3.55, wy - 3.65, h), (wx + 3.55, wy + 3.65, h + 0.18), top)
-        vox = make_fruit(i)
-        me = point_mesh(f"Fruit_{name}", vox) if mode == "gn" else voxel_mesh(f"Fruit_{name}", vox)
+    for i, (name, nf, quads, patches) in enumerate(data):
+        me = fruit_mesh(f"Fruit_{name}", quads, placed[i], AW, AH)
         me.materials.append(fmat)
         ob = bpy.data.objects.new(f"Fruit_{name}", me)
-        if mode == "gn":
-            md = ob.modifiers.new("Cubes", "NODES")
-            md.node_group = ng
-        zlow = min(k[2] for k in vox) - 0.5
-        ob.location = (wx, wy + 0.3, h + 0.18 - zlow * VOX)
+        wx, wy, h = layout(i)
+        zlow = min(v.co.z for v in me.vertices)
+        ob.location = (wx, wy + 0.3, h + 0.18 - zlow)
         ob.rotation_euler = (0, 0, math.radians(((i * 37) % 25) - 12))
         coll.objects.link(ob)
-        fruit_objs.append(ob)
-        cu = bpy.data.curves.new(f"Nom_{i + 1:02d}", "FONT")
-        cu.body = name
-        cu.size = 0.50 if len(name) <= 17 else 0.40
-        cu.extrude = 0.04
-        cu.align_x = "CENTER"
-        cu.materials.append(gold)
-        txt = bpy.data.objects.new(f"Nom_{i + 1:02d}", cu)
-        txt.location = (wx, wy - 3.1, h + 0.2)
-        sc.collection.objects.link(txt)
 
     sun_d = bpy.data.lights.new("Soleil", "SUN")
-    sun_d.energy = 4.0
+    sun_d.energy = 3.0
     sun_d.color = (1.0, 0.92, 0.82)
     sun = bpy.data.objects.new("Soleil", sun_d)
     sun.rotation_euler = (math.radians(48), math.radians(6), math.radians(24))
     sc.collection.objects.link(sun)
     fill_d = bpy.data.lights.new("Lampe", "AREA")
-    fill_d.energy = 5000
+    fill_d.energy = 4000
     fill_d.size = 50
     fill = bpy.data.objects.new("Lampe", fill_d)
     fill.location = (0, -34, 30)
@@ -1051,28 +1151,18 @@ def build(dst, mode="gn", glb=None):
     sc.collection.objects.link(cam2)
 
     bpy.ops.wm.save_as_mainfile(filepath=dst, compress=True)
-    print(f"OK: {dst} ({len(FRUITS)} fruits, mode {mode}, finesse {SCALE})")
-    if glb:
-        try:
-            for o in bpy.data.objects:
-                o.select_set(False)
-            for o in fruit_objs:
-                o.select_set(True)
-            bpy.ops.export_scene.gltf(filepath=glb, use_selection=True, export_apply=True,
-                                      export_vertex_color="ACTIVE", export_format="GLB")
-            print(f"OK: {glb}")
-        except Exception as e:
-            print("glb non exporte :", e)
+    faces = sum(len(d[2]) for d in data)
+    print(f"OK: {dst} ({len(FRUITS)} fruits, {faces} faces, atlas {AW}x{AH})")
 
 
 if __name__ == "__main__":
     if "--stats" in sys.argv:
-        tot = [0, 0, 0, 0]
-        for name, nv, naive, nq, nvert in mesh_stats():
-            print(f"{name:26s} cubes {nv:6d}  faces brutes {naive:6d}  rectangles {nq:6d}  sommets {nvert:6d}")
-            tot = [tot[0] + nv, tot[1] + naive, tot[2] + nq, tot[3] + nvert]
-        print(f"{'TOTAL':26s} cubes {tot[0]:6d}  faces brutes {tot[1]:6d}  rectangles {tot[2]:6d}  sommets {tot[3]:6d}")
+        rows, AW, AH = mesh_stats()
+        tf = 0
+        for n, nf, nq in rows:
+            print(f"{n:26s} cubes fins {nf:6d}  faces fusionnees {nq:5d}")
+            tf += nq
+        print(f"{'TOTAL':26s} faces {tf}  atlas {AW}x{AH}")
         sys.exit(0)
     args = [a for a in sys.argv[1:] if not a.startswith("-")]
-    mode = "mesh" if "--mode=mesh" in sys.argv else "gn"
-    build(args[-1], mode)
+    build(args[-1])

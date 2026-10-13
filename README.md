@@ -62,16 +62,19 @@ Chaque bijū est un dictionnaire dans `tools/make_bijuu.py` (tailles, couleurs, 
 - Aperçus : `apercu/Shidou_Ciseau_Retourne.gif`, `apercu/Shidou_planche.png`, `apercu/Shidou_rendu_eevee.png`.
 
 ## Fruits du démon (One Piece) en cubes
-`models/Fruits_du_Demon.blend` : **26 fruits du démon en voxels**, chacun avec **sa propre forme** et la **peau à spirales en relief** (cubes recolorés et surélevés). Présentoirs en gradins avec le nom de chaque fruit. Scène statique, faite avec Blender 5.2.
+`models/Fruits_du_Demon.blend` : **26 fruits du démon en cubes**, chacun avec **sa propre forme** et la **peau à spirales** de l'œuvre. Présentoirs en gradins avec le nom de chaque fruit. Scène statique, faite avec Blender 5.2.
 
-**Détail et poids** (version précédente → actuelle) :
-| | avant | maintenant |
+**Tout est fusionné pour être léger** :
+| | 1re version | maintenant |
 |---|---|---|
-| taille d'un cube | 18 cm | **9 cm** (spirales et silhouettes 2× plus fines) |
-| cubes | 49 000 | **210 000** |
-| poids du fichier | 2,5 Mo | **0,7 Mo** |
+| faces à afficher (26 fruits) | 141 000 | **15 300** |
+| objets | 26 fruits + 52 présentoirs + 26 textes | **26 fruits + 1 présentoir (étiquettes comprises) + 1 sol** |
+| poids du fichier | 2,5 Mo | **0,9 Mo** |
 
-Le fichier ne contient qu'**un point coloré par cube visible** (le cœur des fruits est vide) ; un modificateur « Nœuds de géométrie » (`Cubes`, le même pour tous les fruits) fabrique les cubes à l'ouverture, en instances (légères en mémoire). Pour obtenir un vrai maillage (appliquer, exporter) : cocher **« Maillage réel »** dans le modificateur, puis *Objet > Appliquer > Modificateur*. Alternative : `python tools/make_fruits_demon.py SORTIE.blend --mode=mesh --scale=1.4` produit un maillage optimisé (faces voisines de même couleur fusionnées, sommets partagés ; ~5 Mo).
+- Chaque fruit est **un seul maillage** de gros cubes (27 cm) : toutes les faces voisines dans le même plan sont fondues en un seul grand rectangle, les faces cachées n'existent pas, les sommets sont partagés (~600 faces par fruit).
+- Les détails fins (spirales, taches du léopard, nervures des feuilles, côtes du cactus, fissures…) ne sont plus faits de milliers de petits cubes : ils sont **peints sur une seule petite texture pixelisée** (`Fruits_atlas`, 256×2048, rangée dans le fichier) partagée par les 26 fruits. Chaque pixel correspond à un cube de 9 cm du modèle détaillé. Les spirales sont donc à plat (plus en relief).
+- Les 26 présentoirs, leurs plateaux et leurs noms forment **un seul objet** (`Presentoirs`).
+- Plus fin (cubes de 18 cm, ~34 000 faces, ~1,6 Mo) : `python tools/make_fruits_demon.py SORTIE.blend --k=2`.
 
 | Fruit | Forme |
 |---|---|
@@ -103,6 +106,6 @@ Le fichier ne contient qu'**un point coloré par cube visible** (le cœur des fr
 | Hie Hie | éclats de glace |
 
 - **Sources** : descriptions des wikis de l'œuvre trouvées par recherche web (je ne peux pas voir les images). **Incertitudes** : Hie Hie n'a pas de design officiel (c'est mon interprétation) ; Pika Pika est décrit tantôt en cloche, tantôt en étoile ; la couleur de Bara Bara varie (rouge-orangé ou violet) ; les couleurs diffèrent entre l'anime et le manga.
-- Chaque fruit est un objet séparé (`Fruit_<nom>`, collection « Fruits »). Caméras : `Camera_Ensemble` (par défaut) et `Camera_GrosPlan`.
-- Régénérer : `python tools/make_fruits_demon.py SORTIE.blend` (option `--scale=1` pour des cubes de 18 cm).
+- Chaque fruit est un objet séparé (`Fruit_<nom>`, collection « Fruits ») : `Ctrl+J` pour en joindre plusieurs. Caméras : `Camera_Ensemble` (par défaut) et `Camera_GrosPlan`.
+- Régénérer : `python tools/make_fruits_demon.py SORTIE.blend` (nécessite `bpy`, `numpy` et `Pillow`).
 - Aperçus : `apercu/Fruits_du_Demon_vue_ensemble.png`, `apercu/Fruits_du_Demon_gros_plans.png` (guide : un fruit par case).
