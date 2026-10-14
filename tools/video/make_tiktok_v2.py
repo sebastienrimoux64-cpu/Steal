@@ -49,7 +49,7 @@ def run(cmd):
 # ============================================================ flocons + paillettes (vidéo noire, mélange « screen »)
 def make_snow(path):
     rng = np.random.default_rng(7)
-    N = 190
+    N = 230
     fl = []
     for i in range(N):
         depth = rng.random()
@@ -66,6 +66,7 @@ def make_snow(path):
     cmd = ["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-", "-c:v", "libx264", "-crf", "12", "-pix_fmt", "yuv420p", path]
     pr = subprocess.Popen(cmd, stdin=subprocess.PIPE)
     n_frames = int(TOTAL * FPS) + 2
+    YY, XX = np.mgrid[:H, :W].astype(np.float32)
     for fi in range(n_frames):
         t = fi / FPS
         img = np.zeros((H, W, 3), dtype=np.float32)
@@ -103,6 +104,13 @@ def make_snow(path):
                 for (px, py) in ((xi + d, yi), (xi, yi + d)):
                     if 0 <= px < W and 0 <= py < H:
                         img[py, px] = np.maximum(img[py, px], (0.8 * a, 0.95 * a, a))
+        for k, c in enumerate(T[1:-1] + [T[-1]]):
+            u = (t - (c - 0.15)) / 0.8
+            if 0 <= u <= 1:
+                pos = (-300 + 1700 * u) * (1 if k % 2 == 0 else 1)
+                dgrid = (XX * (0.6 if k % 2 == 0 else -0.6) + YY * 0.8 + (0 if k % 2 == 0 else 650)) - pos
+                band = (np.exp(-(dgrid / 90.0) ** 2) * 0.55 + np.exp(-(dgrid / 22.0) ** 2) * 0.4)[:, :, None]
+                img = np.maximum(img, band * np.array([0.8, 0.95, 1.0], np.float32))
         pr.stdin.write((np.clip(img, 0, 1) * 255).astype(np.uint8).tobytes())
     pr.stdin.close()
     pr.wait()
@@ -331,30 +339,33 @@ def make_audio():
     n = int(SR * (TOTAL + 0.6))
     sfx = np.zeros(n, np.float32)
     mus = np.zeros(n, np.float32)
-    # transitions : whoosh montant avant la coupe, craquement de glace + impact sur la coupe
-    for k in range(1, len(SEGS) + 1):
+    # un son différent par transition, peu nombreux
+    for k in range(1, len(SEGS)):
         c = T[k]
-        add(sfx, c - 0.45, whoosh(0.8, up=(k % 2 == 1)), 0.9)
-        add(sfx, c - 0.05, ice_crack(rng.integers(7, 12)), 0.95)
-        if k in (4, 6):
-            add(sfx, c + 0.0, shatter(), 0.8)
-    # pops de texte
-    for i in range(len(SEGS)):
-        add(sfx, T[i] + OV * 0.6, pop_tick(), 0.9)
-        add(sfx, T[i] + OV * 0.6 + 0.06, ping(1800 + 200 * i, 0.2, 30), 0.4)
-    # intro et carte de fin
-    add(sfx, 0.0, shatter(), 0.7)
-    add(sfx, 0.0, boom(), 0.5)
+        if k == 1:
+            add(sfx, c - 0.35, whoosh(0.6, up=True), 0.8)
+        elif k == 2:
+            add(sfx, c - 0.3, whoosh(0.55, up=False), 0.7)
+        elif k == 3:
+            add(sfx, c - 0.5, riser(0.7), 0.6)
+            add(sfx, c + 0.1, bell(1568.0, 1.2), 0.5)
+        elif k == 4:
+            add(sfx, c - 0.05, ice_crack(4, 0.15), 0.8)
+        elif k == 5:
+            add(sfx, c - 0.35, whoosh(0.6, up=True), 0.7)
+            add(sfx, c + 0.0, boom(), 0.35)
+        elif k == 6:
+            add(sfx, c - 0.05, shatter(), 0.75)
+    # intro : un seul tintement
+    add(sfx, 0.0, bell(1318.5, 1.2), 0.5)
     e = T[-1]
-    add(sfx, e - 1.5, riser(1.5), 0.95)
-    add(sfx, e, boom(), 1.0)
-    for j, f in enumerate((523.25, 659.25, 783.99, 1046.5, 1318.5)):
-        add(sfx, e + 0.05 + 0.11 * j, bell(f), 0.9)
-    add(sfx, e + 1.4, shatter(), 0.55)
-    add(sfx, e + 1.3, pop_tick(), 0.9)
-    # scintillements aléatoires (tintements doux) sur tout le montage
-    for _ in range(38):
-        add(sfx, rng.uniform(0.3, TOTAL - 0.3), ping(rng.uniform(2600, 6200), 0.5, 7), rng.uniform(0.05, 0.14))
+    add(sfx, e - 1.2, riser(1.2), 0.8)
+    add(sfx, e, boom(), 0.9)
+    for j, f in enumerate((783.99, 1046.5, 1318.5)):
+        add(sfx, e + 0.1 + 0.16 * j, bell(f), 0.7)
+    add(sfx, e + 1.3, pop_tick(), 0.6)
+    for _ in range(8):
+        add(sfx, rng.uniform(0.5, TOTAL - 0.5), ping(rng.uniform(3000, 5600), 0.5, 7), rng.uniform(0.04, 0.08))
     sfx = reverb(sfx)
     # musique légère (120 BPM)
     def kick():
@@ -396,16 +407,16 @@ def make_segments():
     files = []
     for i, (si, st, du, _, _) in enumerate(SEGS):
         L = du + (OV if i < len(SEGS) else 0)
-        zoom = 0.12
+        zoom = 0.24
         fc = (
             f"[0:v]trim=start={st}:duration={L},setpts=PTS-STARTPTS,fps={FPS},split=2[a][b];"
             f"[a]scale=-2:{H},crop={W}:{H},gblur=sigma=20,eq=brightness=0.16:saturation=1.0,colorbalance=rs=-0.12:gs=0.02:bs=0.22:rm=-0.1:gm=0.04:bm=0.2,"
             f"colorchannelmixer=rr=0.8:gg=0.95:bb=1.0:rb=0.05:gb=0.1[bg];"
-            f"[b]crop=720:720:280:0,scale={W}:{W},scale=w='{W}*(1+{zoom}*t/{L})':h='{W}*(1+{zoom}*t/{L})':eval=frame,crop={W}:{W},"
+            f"[b]crop=720:720:280:0,scale={W}:{W},scale=w='{W}*(1+{zoom}*t/{L}+0.10*exp(-9*t))':h='{W}*(1+{zoom}*t/{L}+0.10*exp(-9*t))':eval=frame,crop={W}:{W}:x='(iw-{W})/2+{'-' if i % 2 else ''}60*(t/{L}-0.5)':y='(ih-{W})/2+16*sin(5*t)',"
             f"eq=brightness=0.07:contrast=1.14:saturation=1.35:gamma=0.95,colorbalance=rm=-0.06:bm=0.1:rh=-0.05:bh=0.12,split=2[f1][f2];"
             f"[f2]gblur=sigma=30,eq=brightness=0.05[f3];[f1]format=gbrp[f1r];[f3]format=gbrp[f3r];[f1r][f3r]blend=all_mode=screen:all_opacity=0.40,format=yuva420p,"
             f"geq=lum='lum(X,Y)':cb='cb(X,Y)':cr='cr(X,Y)':a='255*min(1,min(Y,{W - 1}-Y)/170)'[fg];"
-            f"[bg][fg]overlay=(W-w)/2:(H-h)/2-60,format=yuv420p[v];"
+            f"[bg][fg]overlay=(W-w)/2:(H-h)/2-60+14*sin(2.2*t),format=yuv420p[v];"
             f"[0:a]atrim=start={st}:duration={L},asetpts=PTS-STARTPTS,afade=t=in:d=0.03,afade=t=out:st={L - 0.06}:d=0.06,volume=0.5,aformat=sample_rates=44100:channel_layouts=stereo[a]"
         )
         f = f"{TMP}/seg{i}.mp4"
@@ -462,7 +473,7 @@ def final(base, snow, frost, sfx):
         a, b2 = T[i] + OV * 0.55, T[i + 1] + OV * 0.4
         fc.append(f"[{ix[f't{i}']}:v]format=rgba,fade=t=in:st={a:.3f}:d=0.14:alpha=1,fade=t=out:st={b2 - 0.12:.3f}:d=0.12:alpha=1,"
                   f"scale=w='iw*(1+0.45*exp(-9*max(0,t-{a:.3f})))':h=-1:eval=frame[tp{i}]")
-        fc.append(f"[{cur}][tp{i}]overlay=x=(W-w)/2:y='H*0.2-h/2':eof_action=pass:enable='between(t,{a:.3f},{b2:.3f})'[x{i}]")
+        fc.append(f"[{cur}][tp{i}]overlay=x=(W-w)/2:y='H*0.2-h/2+10*sin(3.2*t)':eof_action=pass:enable='between(t,{a:.3f},{b2:.3f})'[x{i}]")
         cur = f"x{i}"
     fc.append(f"[{ix['tag']}:v]format=rgba,fade=t=in:st=0.5:d=0.4:alpha=1,fade=t=out:st={T[-1] - 0.2:.3f}:d=0.3:alpha=1[tgp]")
     fc.append(f"[{cur}][tgp]overlay=x=(W-w)/2:y=H*0.86:eof_action=pass[tg]")
@@ -471,9 +482,9 @@ def final(base, snow, frost, sfx):
     fc.append(f"[tg][le]overlay=x=(W-w)/2:y='H*0.05-h*0.0':eof_action=pass[e1]")
     for nm, y0, dl in (("get", 0.34, 0.35), ("main", 0.385, 0.6), ("bio", 0.70, 1.3)):
         st = e0 + dl
-        fc.append(f"[{ix[nm]}:v]format=rgba,fade=t=in:st={st:.3f}:d=0.25:alpha=1,scale=w='iw*(1+0.4*exp(-8*max(0,t-{st:.3f})))':h=-1:eval=frame[{nm}p]")
-    fc.append(f"[e1][getp]overlay=x=(W-w)/2:y='H*0.375-h/2':eof_action=pass[e2]")
-    fc.append(f"[e2][mainp]overlay=x=(W-w)/2:y='H*0.50-h/2':eof_action=pass[e3]")
+        fc.append(f"[{ix[nm]}:v]format=rgba,fade=t=in:st={st:.3f}:d=0.25:alpha=1,scale=w='iw*(1+0.18*exp(-8*max(0,t-{st:.3f}))+0.02*sin(5*t))':h=-1:eval=frame[{nm}p]")
+    fc.append(f"[e1][getp]overlay=x=(W-w)/2:y='H*0.325-h/2':eof_action=pass[e2]")
+    fc.append(f"[e2][mainp]overlay=x=(W-w)/2:y='H*0.515-h/2':eof_action=pass[e3]")
     fc.append(f"[e3][biop]overlay=x=(W-w)/2:y='H*0.73-h/2':eof_action=pass[e4]")
     cur = "e4"
     fc.append(f"[{ix['lbig']}:v]format=rgba,colorchannelmixer=aa=0.13[wm1]")
