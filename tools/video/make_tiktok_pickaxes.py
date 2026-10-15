@@ -220,7 +220,7 @@ def make_audio():
     add(fx, 0.05, boom(), 0.12)
     e = T[-1]
     add(fx, e - 1.0, riser(1.2), 0.3)
-    add(fx, e + 0.05, boom(), 0.4)
+    add(fx, e + 0.05, boom(), 0.25)
     for j, f in enumerate((783.99, 987.77, 1174.66)):
         add(fx, e + 0.1 + 0.12 * j, bell(f, 1.2), 0.5)
     pr = e + 1.05                                                                    # « ka-ching » quand le prix apparaît
@@ -257,8 +257,8 @@ def make_audio():
         add(mus, t0 + beat / 2, pluck(arp[(b + 3) % 8] * 2), 0.28 * g)
         t0 += beat
         b += 1
-    mix = fx * 1.0 + mus * 0.5
-    mix = mix / (np.max(np.abs(mix)) + 1e-6) * 0.9
+    mix = fx                                   # pas de musique de fond : uniquement les effets sonores
+    mix = mix / (np.max(np.abs(mix)) + 1e-6) * 0.7
     p = f"{TMP}/sfx.wav"
     with wave.open(p, "wb") as w:
         w.setnchannels(1); w.setsampwidth(2); w.setframerate(SR)
@@ -368,7 +368,7 @@ def final(base, dust, sfx):
     cx = "if(lt(mod(t,16),4),40,if(lt(mod(t,16),8),W-w-40,if(lt(mod(t,16),12),40,W-w-40)))"
     cy = "if(lt(mod(t,16),4),620,if(lt(mod(t,16),8),1000,if(lt(mod(t,16),12),1130,720)))"
     fc.append(f"[{cur}][wmk]overlay=x='{cx}':y='{cy}':eof_action=pass:enable='lt(t,{e0:.3f})',format=yuv420p[vout]")
-    fc.append(f"[{ix['sfx']}:a]aformat=sample_rates=44100:channel_layouts=stereo,loudnorm=I=-16:TP=-2:LRA=5,afade=t=out:st={TOTAL - 0.5:.2f}:d=0.5[aout]")
+    fc.append(f"[{ix['sfx']}:a]aformat=sample_rates=44100:channel_layouts=stereo,volume=2.0,alimiter=limit=0.9,afade=t=out:st={TOTAL - 0.5:.2f}:d=0.5[aout]")
     run(["ffmpeg", "-y", "-loglevel", "error"] + inp + ["-filter_complex", ";".join(fc), "-map", "[vout]", "-map", "[aout]", "-t", f"{TOTAL:.2f}", "-c:v", "libx264", "-crf", "18", "-preset", "medium",
                                                        "-pix_fmt", "yuv420p", "-r", str(FPS), "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", out])
 
