@@ -1,5 +1,5 @@
 """
-TikTok (1080x1920, 30 i/s) pour le pack « 8 pioches réalistes » (Haatkeoz.fr) à partir de la vidéo de présentation.
+TikTok (1080x1920, 30 i/s) pour le pack « 8 pioches réalistes » (Haakoz.com) à partir de la vidéo de présentation.
 
     python tools/video/make_tiktok_pickaxes.py <pioches.mp4> <sortie.mp4>
 
@@ -31,7 +31,7 @@ SQ_Y = 330                      # la pioche (recadrage vertical) occupe 330 → 
 FH = 1388                       # hauteur du recadrage 560x720 mis à la largeur 1080
 PRICE_EUR = 10
 PRICE = "$9"                    # prix confirmé par l'utilisateur (≈ 10 €)
-SITE = "HAATKEOZ.FR"
+SITE = "HAAKOZ.COM"
 
 # nom, couleur de la lueur, dégradé du texte (haut, bas)
 TIERS = [
@@ -274,7 +274,7 @@ def make_segments():
         if kind == "intro":
             crop = "delogo=x=598:y=50:w=40:h=70,crop=560:720:600:0"
         else:
-            crop = "crop=560:720:600:0"
+            crop = "delogo=x=470:y=285:w=130:h=65,crop=560:720:525:0"   # centré sur le socle (x≈805) ; delogo masque le bout du nom français
         d = f"{'-' if i % 2 else ''}60"
         fc = (
             f"[0:v]trim=start={st}:duration={L},setpts=PTS-STARTPTS,fps={FPS},split=2[a][b];"
