@@ -30,7 +30,7 @@ OV = 0.4
 SQ_Y = 330                      # la pioche (recadrage vertical) occupe 330 → 1718 ; le bas est de toute façon mangé par l'interface TikTok
 FH = 1388                       # hauteur du recadrage 560x720 mis à la largeur 1080
 PRICE_EUR = 10
-PRICE = "$11.50"                # 10 € ≈ 11,5 $ (taux ≈ 1,15) — à ajuster si besoin
+PRICE = "$9"                    # prix confirmé par l'utilisateur (≈ 10 €)
 SITE = "HAATKEOZ.FR"
 
 # nom, couleur de la lueur, dégradé du texte (haut, bas)
